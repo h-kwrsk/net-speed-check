@@ -1,5 +1,7 @@
 # net-speed-check
 
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
+
 Raspberry Pi の Kubernetes クラスタ上でインターネット速度を定期計測し、Grafana で可視化するシステムです。
 
 ## アーキテクチャ
@@ -122,3 +124,7 @@ python -m pytest test_run.py -v
 | `speedtest_upload_bits_per_second` | アップロード速度（bps） |
 | `speedtest_ping_latency_milliseconds` | ping レイテンシ（ms） |
 | `speedtest_server_info` | 計測に使用したサーバー情報 |
+
+## ライセンス
+
+[MIT License](LICENSE)
