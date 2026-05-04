@@ -40,7 +40,7 @@ data:
               "color": {"mode": "fixed", "fixedColor": "blue"},
               "custom": {
                 "drawStyle": "line",
-                "lineInterpolation": "linear",
+                "lineInterpolation": "smooth",
                 "lineWidth": 2,
                 "fillOpacity": 10,
                 "showPoints": "always",
@@ -75,7 +75,7 @@ data:
               "color": {"mode": "fixed", "fixedColor": "green"},
               "custom": {
                 "drawStyle": "line",
-                "lineInterpolation": "linear",
+                "lineInterpolation": "smooth",
                 "lineWidth": 2,
                 "fillOpacity": 10,
                 "showPoints": "always",
@@ -110,7 +110,7 @@ data:
               "color": {"mode": "fixed", "fixedColor": "orange"},
               "custom": {
                 "drawStyle": "line",
-                "lineInterpolation": "linear",
+                "lineInterpolation": "smooth",
                 "lineWidth": 2,
                 "fillOpacity": 10,
                 "showPoints": "always",
