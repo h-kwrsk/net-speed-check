@@ -2,6 +2,7 @@
 import logging
 import os
 import sys
+import time
 
 import speedtest
 from prometheus_client import CollectorRegistry, Gauge, push_to_gateway
@@ -11,31 +12,44 @@ log = logging.getLogger(__name__)
 
 PUSHGATEWAY_URL = os.environ.get("PUSHGATEWAY_URL", "http://pushgateway:9091")
 INSTANCE = os.environ.get("SPEEDTEST_INSTANCE", "raspi-cluster")
+MAX_RETRIES = 3
+RETRY_DELAY = 30  # seconds
 
 
 def run_speedtest():
-    log.info("Initializing speedtest client...")
-    st = speedtest.Speedtest(secure=True)
+    last_error = None
+    for attempt in range(1, MAX_RETRIES + 1):
+        try:
+            log.info("Initializing speedtest client... (attempt %d/%d)", attempt, MAX_RETRIES)
+            st = speedtest.Speedtest(secure=True)
 
-    log.info("Selecting best server...")
-    st.get_best_server()
+            log.info("Selecting best server...")
+            st.get_best_server()
 
-    log.info("Running download test...")
-    st.download()
+            log.info("Running download test...")
+            st.download()
 
-    log.info("Running upload test...")
-    st.upload()
+            log.info("Running upload test...")
+            st.upload()
 
-    results = st.results.dict()
-    log.info(
-        "Results: download=%.2f Mbps, upload=%.2f Mbps, ping=%.2f ms, server=%s (%s)",
-        results["download"] / 1e6,
-        results["upload"] / 1e6,
-        results["ping"],
-        results["server"]["name"],
-        results["server"]["country"],
-    )
-    return results
+            results = st.results.dict()
+            log.info(
+                "Results: download=%.2f Mbps, upload=%.2f Mbps, ping=%.2f ms, server=%s (%s)",
+                results["download"] / 1e6,
+                results["upload"] / 1e6,
+                results["ping"],
+                results["server"]["name"],
+                results["server"]["country"],
+            )
+            return results
+        except Exception as e:
+            last_error = e
+            log.warning("Attempt %d/%d failed: %s", attempt, MAX_RETRIES, e)
+            if attempt < MAX_RETRIES:
+                log.info("Retrying in %d seconds...", RETRY_DELAY)
+                time.sleep(RETRY_DELAY)
+
+    raise last_error
 
 
 def push_metrics(results):
