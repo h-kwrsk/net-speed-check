@@ -43,7 +43,7 @@ data:
                 "lineInterpolation": "smooth",
                 "lineWidth": 2,
                 "fillOpacity": 10,
-                "showPoints": "always",
+                "showPoints": "never",
                 "pointSize": 5,
                 "spanNulls": false
               }
@@ -78,7 +78,7 @@ data:
                 "lineInterpolation": "smooth",
                 "lineWidth": 2,
                 "fillOpacity": 10,
-                "showPoints": "always",
+                "showPoints": "never",
                 "pointSize": 5,
                 "spanNulls": false
               }
@@ -113,7 +113,7 @@ data:
                 "lineInterpolation": "smooth",
                 "lineWidth": 2,
                 "fillOpacity": 10,
-                "showPoints": "always",
+                "showPoints": "never",
                 "pointSize": 5,
                 "spanNulls": false
               }
