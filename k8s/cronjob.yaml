@@ -1,0 +1,38 @@
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: speedtest
+  namespace: monitoring
+  labels:
+    app: speedtest
+spec:
+  schedule: "*/30 * * * *"
+  concurrencyPolicy: Forbid
+  startingDeadlineSeconds: 60
+  successfulJobsHistoryLimit: 3
+  failedJobsHistoryLimit: 3
+  jobTemplate:
+    spec:
+      backoffLimit: 0
+      template:
+        metadata:
+          labels:
+            app: speedtest
+        spec:
+          restartPolicy: Never
+          containers:
+            - name: speedtest
+              image: hkwrsk/net-speed-check:latest
+              imagePullPolicy: Always
+              env:
+                - name: PUSHGATEWAY_URL
+                  value: "http://pushgateway.monitoring.svc.cluster.local:9091"
+                - name: SPEEDTEST_INSTANCE
+                  value: "raspi-cluster"
+              resources:
+                requests:
+                  cpu: 100m
+                  memory: 128Mi
+                limits:
+                  cpu: 250m
+                  memory: 256Mi
