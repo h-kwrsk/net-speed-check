@@ -19,8 +19,8 @@ PUSHGATEWAY_URL = os.environ.get("PUSHGATEWAY_URL", "http://pushgateway:9091")
 INSTANCE = os.environ.get("SPEEDTEST_INSTANCE", "raspi-cluster")
 
 # speedtest.net の API は稀に一時的な接続エラーを返すため、リトライで吸収する
-MAX_RETRIES = 3
-RETRY_DELAY = 30  # seconds
+MAX_RETRIES = int(os.environ.get("SPEEDTEST_MAX_RETRIES", "3"))
+RETRY_DELAY = int(os.environ.get("SPEEDTEST_RETRY_DELAY", "30"))  # seconds
 
 
 def run_speedtest():

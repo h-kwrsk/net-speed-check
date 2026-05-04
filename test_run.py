@@ -1,6 +1,6 @@
 """run.py の単体テスト"""
 import unittest
-from unittest.mock import MagicMock, call, patch
+from unittest.mock import MagicMock, patch
 
 import run
 
@@ -87,6 +87,22 @@ class TestPushMetrics(unittest.TestCase):
         self.assertEqual(kwargs["job"], "speedtest")
         self.assertEqual(kwargs["grouping_key"], {"instance": run.INSTANCE})
 
+        # registry 内のメトリクス値を検証する
+        registry = kwargs["registry"]
+        metrics = {m.name: m for m in registry.collect()}
+        self.assertAlmostEqual(
+            list(metrics["speedtest_download_bits_per_second"].samples)[0].value,
+            SAMPLE_RESULTS["download"],
+        )
+        self.assertAlmostEqual(
+            list(metrics["speedtest_upload_bits_per_second"].samples)[0].value,
+            SAMPLE_RESULTS["upload"],
+        )
+        self.assertAlmostEqual(
+            list(metrics["speedtest_ping_latency_milliseconds"].samples)[0].value,
+            SAMPLE_RESULTS["ping"],
+        )
+
     @patch("run.push_to_gateway")
     def test_sponsor_defaults_to_empty_string(self, mock_push):
         """正常系: server に sponsor キーがなくても空文字列で補完される"""
@@ -100,7 +116,7 @@ class TestPushMetrics(unittest.TestCase):
     @patch("run.push_to_gateway", side_effect=Exception("connection refused"))
     def test_raises_on_pushgateway_error(self, _mock_push):
         """異常系: Pushgateway への送信が失敗した場合に例外が送出される"""
-        with self.assertRaises(Exception, msg="connection refused"):
+        with self.assertRaises(Exception):
             run.push_metrics(SAMPLE_RESULTS)
 
 

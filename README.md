@@ -4,7 +4,7 @@ Raspberry Pi の Kubernetes クラスタ上でインターネット速度を定�
 
 ## アーキテクチャ
 
-```
+```text
 [CronJob (30分毎)]
        |
    run.py
@@ -23,7 +23,7 @@ Raspberry Pi の Kubernetes クラスタ上でインターネット速度を定�
 
 ## ファイル構成
 
-```
+```text
 .
 ├── run.py                        # 速度計測 & Pushgateway 送信スクリプト
 ├── test_run.py                   # 単体テスト
@@ -61,8 +61,8 @@ docker buildx build \
 ### 3. クラスタへデプロイ
 
 ```bash
-scp -r k8s/ <master-node>:~/net-speed-check/
-ssh <master-node> "kubectl apply -f ~/net-speed-check/k8s/"
+scp -r k8s/ raspi-master.local:~/net-speed-check/
+ssh raspi-master.local "kubectl apply -f ~/net-speed-check/k8s/"
 ```
 
 ## 動作確認
@@ -70,19 +70,19 @@ ssh <master-node> "kubectl apply -f ~/net-speed-check/k8s/"
 ### 手動実行
 
 ```bash
-ssh <master-node> \
+ssh raspi-master.local \
   "kubectl create job --from=cronjob/speedtest speedtest-manual -n monitoring"
 ```
 
 ### ログ確認
 
 ```bash
-ssh <master-node> "kubectl logs -n monitoring job/speedtest-manual"
+ssh raspi-master.local "kubectl logs -n monitoring job/speedtest-manual"
 ```
 
 正常時の出力例:
 
-```
+```text
 2026-05-04 17:18:58,330 INFO Initializing speedtest client... (attempt 1/3)
 2026-05-04 17:18:59,340 INFO Selecting best server...
 2026-05-04 17:19:00,232 INFO Running download test...
@@ -110,14 +110,14 @@ python -m pytest test_run.py -v
 ### 設定できる環境変数
 
 | 変数名 | デフォルト値 | 説明 |
-|---|---|---|
+| --- | --- | --- |
 | `PUSHGATEWAY_URL` | `http://pushgateway:9091` | Prometheus Pushgateway のエンドポイント |
 | `SPEEDTEST_INSTANCE` | `raspi-cluster` | Prometheus の `instance` ラベルに使う識別子 |
 
 ## 収集するメトリクス
 
 | メトリクス名 | 説明 |
-|---|---|
+| --- | --- |
 | `speedtest_download_bits_per_second` | ダウンロード速度（bps） |
 | `speedtest_upload_bits_per_second` | アップロード速度（bps） |
 | `speedtest_ping_latency_milliseconds` | ping レイテンシ（ms） |
