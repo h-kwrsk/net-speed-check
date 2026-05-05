@@ -60,6 +60,38 @@ class TestRunSpeedtest(unittest.TestCase):
 
     @patch("run.time.sleep")
     @patch("run.speedtest.Speedtest")
+    def test_retries_on_zero_download(self, mock_cls, mock_sleep):
+        """準正常系: download が 0 の場合にリトライし、次回成功する"""
+        zero_result = {**SAMPLE_RESULTS, "download": 0.0}
+        mock_cls.side_effect = [
+            make_mock_speedtest(zero_result),
+            make_mock_speedtest(),
+        ]
+
+        results = run.run_speedtest()
+
+        self.assertEqual(results["download"], SAMPLE_RESULTS["download"])
+        self.assertEqual(mock_cls.call_count, 2)
+        mock_sleep.assert_called_once_with(run.RETRY_DELAY)
+
+    @patch("run.time.sleep")
+    @patch("run.speedtest.Speedtest")
+    def test_retries_on_zero_upload(self, mock_cls, mock_sleep):
+        """準正常系: upload が 0 の場合にリトライし、次回成功する"""
+        zero_result = {**SAMPLE_RESULTS, "upload": 0.0}
+        mock_cls.side_effect = [
+            make_mock_speedtest(zero_result),
+            make_mock_speedtest(),
+        ]
+
+        results = run.run_speedtest()
+
+        self.assertEqual(results["upload"], SAMPLE_RESULTS["upload"])
+        self.assertEqual(mock_cls.call_count, 2)
+        mock_sleep.assert_called_once_with(run.RETRY_DELAY)
+
+    @patch("run.time.sleep")
+    @patch("run.speedtest.Speedtest")
     def test_raises_after_max_retries(self, mock_cls, mock_sleep):
         """異常系: MAX_RETRIES 回すべて失敗した場合に例外が送出される"""
         error = Exception("Unable to connect to servers to test latency.")

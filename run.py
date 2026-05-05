@@ -41,6 +41,14 @@ def run_speedtest():
             st.upload()
 
             results = st.results.dict()
+
+            # 0 Mbps は計測失敗とみなしてリトライする
+            if results["download"] == 0 or results["upload"] == 0:
+                raise ValueError(
+                    f"Invalid result: download={results['download'] / 1e6:.2f} Mbps, "
+                    f"upload={results['upload'] / 1e6:.2f} Mbps"
+                )
+
             log.info(
                 "Results: download=%.2f Mbps, upload=%.2f Mbps, ping=%.2f ms, server=%s (%s)",
                 results["download"] / 1e6,
