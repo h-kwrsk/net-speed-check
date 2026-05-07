@@ -133,7 +133,7 @@ data:
         {
           "id": 5,
           "type": "row",
-          "title": "Current / Average",
+          "title": "Current Values",
           "gridPos": {"h": 1, "w": 24, "x": 0, "y": 9},
           "collapsed": false
         },
@@ -141,7 +141,7 @@ data:
           "id": 6,
           "type": "gauge",
           "title": "Download (Current)",
-          "gridPos": {"h": 8, "w": 4, "x": 0, "y": 10},
+          "gridPos": {"h": 8, "w": 8, "x": 0, "y": 10},
           "datasource": {"type": "prometheus", "uid": "${datasource}"},
           "fieldConfig": {
             "defaults": {
@@ -162,44 +162,6 @@ data:
           },
           "options": {
             "reduceOptions": {"calcs": ["lastNotNull"]},
-            "orientation": "auto",
-            "showThresholdLabels": false,
-            "showThresholdMarkers": true
-          },
-          "targets": [
-            {
-              "refId": "A",
-              "datasource": {"type": "prometheus", "uid": "${datasource}"},
-              "expr": "speedtest_download_bits_per_second{job=\"speedtest\", instance=\"raspi-cluster\"}",
-              "legendFormat": "Download"
-            }
-          ]
-        },
-        {
-          "id": 7,
-          "type": "gauge",
-          "title": "Download (Average)",
-          "gridPos": {"h": 8, "w": 4, "x": 4, "y": 10},
-          "datasource": {"type": "prometheus", "uid": "${datasource}"},
-          "fieldConfig": {
-            "defaults": {
-              "unit": "bps",
-              "min": 0,
-              "max": 1000000000,
-              "color": {"mode": "thresholds"},
-              "thresholds": {
-                "mode": "absolute",
-                "steps": [
-                  {"color": "red", "value": 0},
-                  {"color": "yellow", "value": 10000000},
-                  {"color": "green", "value": 50000000}
-                ]
-              }
-            },
-            "overrides": []
-          },
-          "options": {
-            "reduceOptions": {"calcs": ["mean"]},
             "orientation": "auto",
             "showThresholdLabels": false,
             "showThresholdMarkers": true
@@ -217,7 +179,7 @@ data:
           "id": 8,
           "type": "gauge",
           "title": "Upload (Current)",
-          "gridPos": {"h": 8, "w": 4, "x": 8, "y": 10},
+          "gridPos": {"h": 8, "w": 8, "x": 8, "y": 10},
           "datasource": {"type": "prometheus", "uid": "${datasource}"},
           "fieldConfig": {
             "defaults": {
@@ -252,48 +214,10 @@ data:
           ]
         },
         {
-          "id": 9,
-          "type": "gauge",
-          "title": "Upload (Average)",
-          "gridPos": {"h": 8, "w": 4, "x": 12, "y": 10},
-          "datasource": {"type": "prometheus", "uid": "${datasource}"},
-          "fieldConfig": {
-            "defaults": {
-              "unit": "bps",
-              "min": 0,
-              "max": 1000000000,
-              "color": {"mode": "thresholds"},
-              "thresholds": {
-                "mode": "absolute",
-                "steps": [
-                  {"color": "red", "value": 0},
-                  {"color": "yellow", "value": 5000000},
-                  {"color": "green", "value": 20000000}
-                ]
-              }
-            },
-            "overrides": []
-          },
-          "options": {
-            "reduceOptions": {"calcs": ["mean"]},
-            "orientation": "auto",
-            "showThresholdLabels": false,
-            "showThresholdMarkers": true
-          },
-          "targets": [
-            {
-              "refId": "A",
-              "datasource": {"type": "prometheus", "uid": "${datasource}"},
-              "expr": "speedtest_upload_bits_per_second{job=\"speedtest\", instance=\"raspi-cluster\"}",
-              "legendFormat": "Upload"
-            }
-          ]
-        },
-        {
           "id": 10,
           "type": "gauge",
           "title": "Ping (Current)",
-          "gridPos": {"h": 8, "w": 4, "x": 16, "y": 10},
+          "gridPos": {"h": 8, "w": 8, "x": 16, "y": 10},
           "datasource": {"type": "prometheus", "uid": "${datasource}"},
           "fieldConfig": {
             "defaults": {
@@ -328,10 +252,93 @@ data:
           ]
         },
         {
+          "id": 12,
+          "type": "row",
+          "title": "Average Values",
+          "gridPos": {"h": 1, "w": 24, "x": 0, "y": 18},
+          "collapsed": false
+        },
+        {
+          "id": 7,
+          "type": "gauge",
+          "title": "Download (Average)",
+          "gridPos": {"h": 8, "w": 8, "x": 0, "y": 19},
+          "datasource": {"type": "prometheus", "uid": "${datasource}"},
+          "fieldConfig": {
+            "defaults": {
+              "unit": "bps",
+              "min": 0,
+              "max": 1000000000,
+              "color": {"mode": "thresholds"},
+              "thresholds": {
+                "mode": "absolute",
+                "steps": [
+                  {"color": "red", "value": 0},
+                  {"color": "yellow", "value": 10000000},
+                  {"color": "green", "value": 50000000}
+                ]
+              }
+            },
+            "overrides": []
+          },
+          "options": {
+            "reduceOptions": {"calcs": ["mean"]},
+            "orientation": "auto",
+            "showThresholdLabels": false,
+            "showThresholdMarkers": true
+          },
+          "targets": [
+            {
+              "refId": "A",
+              "datasource": {"type": "prometheus", "uid": "${datasource}"},
+              "expr": "speedtest_download_bits_per_second{job=\"speedtest\", instance=\"raspi-cluster\"}",
+              "legendFormat": "Download"
+            }
+          ]
+        },
+        {
+          "id": 9,
+          "type": "gauge",
+          "title": "Upload (Average)",
+          "gridPos": {"h": 8, "w": 8, "x": 8, "y": 19},
+          "datasource": {"type": "prometheus", "uid": "${datasource}"},
+          "fieldConfig": {
+            "defaults": {
+              "unit": "bps",
+              "min": 0,
+              "max": 1000000000,
+              "color": {"mode": "thresholds"},
+              "thresholds": {
+                "mode": "absolute",
+                "steps": [
+                  {"color": "red", "value": 0},
+                  {"color": "yellow", "value": 5000000},
+                  {"color": "green", "value": 20000000}
+                ]
+              }
+            },
+            "overrides": []
+          },
+          "options": {
+            "reduceOptions": {"calcs": ["mean"]},
+            "orientation": "auto",
+            "showThresholdLabels": false,
+            "showThresholdMarkers": true
+          },
+          "targets": [
+            {
+              "refId": "A",
+              "datasource": {"type": "prometheus", "uid": "${datasource}"},
+              "expr": "speedtest_upload_bits_per_second{job=\"speedtest\", instance=\"raspi-cluster\"}",
+              "legendFormat": "Upload"
+            }
+          ]
+        },
+        {
           "id": 11,
           "type": "gauge",
           "title": "Ping (Average)",
-          "gridPos": {"h": 8, "w": 4, "x": 20, "y": 10},
+          "gridPos": {"h": 8, "w": 8, "x": 16, "y": 19},
           "datasource": {"type": "prometheus", "uid": "${datasource}"},
           "fieldConfig": {
             "defaults": {
