@@ -38,7 +38,8 @@ def run_speedtest():
             st.download()
 
             log.info("Running upload test...")
-            st.upload()
+            # threads=1 で安定して計測できるケースがある（Raspberry Pi 環境での upload=0 対策）
+            st.upload(threads=1)
 
             results = st.results.dict()
 
