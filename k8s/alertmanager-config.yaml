@@ -10,6 +10,7 @@ spec:
     receiver: line-webhook
     groupWait: 10s
     groupInterval: 5m
+    # 失敗 Job は failedJobsHistoryLimit の間メトリクスに残り続けるため、再通知を抑制する
     repeatInterval: 12h
     matchers:
       - name: alertname

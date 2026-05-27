@@ -54,6 +54,7 @@ class WebhookHandler(BaseHTTPRequestHandler):
         self.end_headers()
 
     def log_message(self, format, *args):
+        # BaseHTTPRequestHandler のデフォルト実装は HTTP アクセスログを stderr に出力するため抑制する
         pass
 
 
