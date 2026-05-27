@@ -29,6 +29,15 @@ def make_handler(body_dict: dict) -> WebhookHandler:
     return handler
 
 
+def make_get_handler(path: str) -> WebhookHandler:
+    """GET リクエスト用の WebhookHandler をモックで生成する"""
+    handler = WebhookHandler.__new__(WebhookHandler)
+    handler.path = path
+    handler.send_response = MagicMock()
+    handler.end_headers = MagicMock()
+    return handler
+
+
 class TestFormatMessage(unittest.TestCase):
 
     def test_firing_includes_all_fields(self):
@@ -121,6 +130,33 @@ class TestWebhookHandler(unittest.TestCase):
         handler = make_handler({"alerts": [SAMPLE_ALERT]})
         handler.do_POST()
         handler.send_response.assert_called_once_with(500)
+
+    @patch("app.send_line_message")
+    def test_empty_body_returns_200(self, mock_send):
+        """正常系: Content-Length が 0 のリクエストでも 200 を返し LINE 送信は行わない"""
+        handler = WebhookHandler.__new__(WebhookHandler)
+        handler.headers = {"Content-Length": "0"}
+        handler.rfile = io.BytesIO(b"")
+        handler.send_response = MagicMock()
+        handler.end_headers = MagicMock()
+        handler.do_POST()
+        mock_send.assert_not_called()
+        handler.send_response.assert_called_once_with(200)
+
+
+class TestHealthzHandler(unittest.TestCase):
+
+    def test_healthz_returns_200(self):
+        """/healthz は 200 を返す"""
+        handler = make_get_handler("/healthz")
+        handler.do_GET()
+        handler.send_response.assert_called_once_with(200)
+
+    def test_unknown_path_returns_404(self):
+        """未知のパスは 404 を返す"""
+        handler = make_get_handler("/unknown")
+        handler.do_GET()
+        handler.send_response.assert_called_once_with(404)
 
 
 if __name__ == "__main__":

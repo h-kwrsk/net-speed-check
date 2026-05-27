@@ -39,10 +39,17 @@ def format_message(alert: dict) -> str:
 
 
 class WebhookHandler(BaseHTTPRequestHandler):
+    def do_GET(self):
+        if self.path == "/healthz":
+            self.send_response(200)
+        else:
+            self.send_response(404)
+        self.end_headers()
+
     def do_POST(self):
         try:
             length = int(self.headers.get("Content-Length", 0))
-            body = json.loads(self.rfile.read(length))
+            body = json.loads(self.rfile.read(length)) if length > 0 else {}
             for alert in body.get("alerts", []):
                 text = format_message(alert)
                 send_line_message(text)
