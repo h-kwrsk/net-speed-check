@@ -12,6 +12,7 @@ log = logging.getLogger(__name__)
 CHANNEL_ACCESS_TOKEN = os.environ["LINE_CHANNEL_ACCESS_TOKEN"]
 USER_ID = os.environ["LINE_USER_ID"]
 LINE_API = "https://api.line.me/v2/bot/message/push"
+MAX_BODY_SIZE = 1024 * 1024  # 1MB: Alertmanager のペイロードは通常数 KB 以内
 
 
 def send_line_message(text: str) -> None:
@@ -49,6 +50,10 @@ class WebhookHandler(BaseHTTPRequestHandler):
     def do_POST(self):
         try:
             length = int(self.headers.get("Content-Length", 0))
+            if length > MAX_BODY_SIZE:
+                self.send_response(413)
+                self.end_headers()
+                return
             body = json.loads(self.rfile.read(length)) if length > 0 else {}
             for alert in body.get("alerts", []):
                 text = format_message(alert)

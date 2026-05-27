@@ -9,7 +9,7 @@ from unittest.mock import MagicMock, patch
 os.environ.setdefault("LINE_CHANNEL_ACCESS_TOKEN", "test-token")
 os.environ.setdefault("LINE_USER_ID", "Utest000")
 
-from app import WebhookHandler, format_message, send_line_message  # noqa: E402
+from app import MAX_BODY_SIZE, WebhookHandler, format_message, send_line_message  # noqa: E402
 
 SAMPLE_ALERT = {
     "status": "firing",
@@ -130,6 +130,18 @@ class TestWebhookHandler(unittest.TestCase):
         handler = make_handler({"alerts": [SAMPLE_ALERT]})
         handler.do_POST()
         handler.send_response.assert_called_once_with(500)
+
+    @patch("app.send_line_message")
+    def test_oversized_body_returns_413(self, mock_send):
+        """異常系: MAX_BODY_SIZE を超えるリクエストは 413 を返し LINE 送信は行わない"""
+        handler = WebhookHandler.__new__(WebhookHandler)
+        handler.headers = {"Content-Length": str(MAX_BODY_SIZE + 1)}
+        handler.rfile = io.BytesIO(b"")
+        handler.send_response = MagicMock()
+        handler.end_headers = MagicMock()
+        handler.do_POST()
+        mock_send.assert_not_called()
+        handler.send_response.assert_called_once_with(413)
 
     @patch("app.send_line_message")
     def test_empty_body_returns_200(self, mock_send):
