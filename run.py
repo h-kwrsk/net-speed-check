@@ -1,14 +1,15 @@
 #!/usr/bin/env python3
 """
 インターネット速度を計測し、結果を Prometheus Pushgateway へ送信するスクリプト。
-Kubernetes CronJob として 30 分ごとに実行されることを想定している。
+Kubernetes CronJob として 15 分ごとに実行されることを想定している。
 """
+import json
 import logging
 import os
+import subprocess
 import sys
 import time
 
-import speedtest
 from prometheus_client import CollectorRegistry, Gauge, push_to_gateway
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
@@ -23,27 +24,58 @@ MAX_RETRIES = int(os.environ.get("SPEEDTEST_MAX_RETRIES", "3"))
 RETRY_DELAY = int(os.environ.get("SPEEDTEST_RETRY_DELAY", "30"))  # seconds
 
 
+def _parse_result(stdout: str) -> dict:
+    """speedtest CLI の JSON 出力から type=result のオブジェクトを抽出する。
+    CLI は計測段階ごとに複数行の JSON を出力するため、最終結果行を探す。
+    """
+    for line in stdout.strip().split("\n"):
+        try:
+            obj = json.loads(line)
+            if obj.get("type") == "result":
+                return obj
+        except json.JSONDecodeError:
+            continue
+    raise RuntimeError(f"No result found in speedtest output: {stdout[:200]}")
+
+
 def run_speedtest():
     """速度計測を実行して結果の dict を返す。失敗した場合は MAX_RETRIES 回リトライする。"""
     last_error = None
     for attempt in range(1, MAX_RETRIES + 1):
         try:
-            log.info("Initializing speedtest client... (attempt %d/%d)", attempt, MAX_RETRIES)
-            st = speedtest.Speedtest(secure=True)
+            log.info("Running speedtest... (attempt %d/%d)", attempt, MAX_RETRIES)
+            proc = subprocess.run(
+                ["speedtest", "--format=json", "--accept-license", "--accept-gdpr"],
+                capture_output=True,
+                text=True,
+                timeout=120,
+            )
+            if proc.returncode != 0:
+                raise RuntimeError(
+                    f"speedtest exited with code {proc.returncode}: {proc.stderr.strip()}"
+                )
 
-            log.info("Selecting best server...")
-            st.get_best_server()
+            data = _parse_result(proc.stdout)
 
-            log.info("Running download test...")
-            st.download()
+            # Ookla CLI の bandwidth は bytes/s のため bits/s へ変換する
+            download = float(data["download"]["bandwidth"]) * 8
+            upload = float(data["upload"]["bandwidth"]) * 8
+            ping = float(data["ping"]["latency"])
+            server = data["server"]
+            port = server.get("port", "")
+            host = f"{server['host']}:{port}" if port else server["host"]
 
-            # 奇数回は threads=1、偶数回はデフォルト(None)を交互に試す。
-            # Raspberry Pi でマルチスレッド upload が 0 Mbps を返す問題を軽減するため。
-            upload_threads = 1 if attempt % 2 == 1 else None
-            log.info("Running upload test... (threads=%s)", upload_threads)
-            st.upload(threads=upload_threads)
-
-            results = st.results.dict()
+            results = {
+                "download": download,
+                "upload": upload,
+                "ping": ping,
+                "server": {
+                    "name": server["name"],
+                    "host": host,
+                    "country": server["country"],
+                    "sponsor": "",
+                },
+            }
 
             # 0 Mbps は計測失敗とみなしてリトライする
             if results["download"] == 0 or results["upload"] == 0:
@@ -110,7 +142,7 @@ def push_metrics(results):
         server_name=server["name"],
         server_host=server["host"],
         server_country=server["country"],
-        server_sponsor=server.get("sponsor", ""),
+        server_sponsor=server["sponsor"],
     ).set(1)
 
     log.info("Pushing metrics to %s ...", PUSHGATEWAY_URL)
