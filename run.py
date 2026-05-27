@@ -142,7 +142,7 @@ def push_metrics(results):
         server_name=server["name"],
         server_host=server["host"],
         server_country=server["country"],
-        server_sponsor=server.get("sponsor", ""),
+        server_sponsor=server["sponsor"],
     ).set(1)
 
     log.info("Pushing metrics to %s ...", PUSHGATEWAY_URL)

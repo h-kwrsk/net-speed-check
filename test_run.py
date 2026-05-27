@@ -138,9 +138,10 @@ class TestRunSpeedtest(unittest.TestCase):
         """異常系: MAX_RETRIES 回すべて失敗した場合に例外が送出される"""
         mock_run.return_value = make_proc(returncode=1, stderr="connection refused")
 
-        with self.assertRaises(Exception):
+        with self.assertRaises(RuntimeError) as ctx:
             run.run_speedtest()
 
+        self.assertIn("connection refused", str(ctx.exception))
         self.assertEqual(mock_run.call_count, run.MAX_RETRIES)
         self.assertEqual(mock_sleep.call_count, run.MAX_RETRIES - 1)
 

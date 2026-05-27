@@ -7,6 +7,8 @@ ENV HOME=/tmp
 WORKDIR /app
 
 # Ookla 公式 speedtest CLI のインストール
+# NOTE: bookworm は python:3.12-slim のベース Debian バージョン
+#       ベースイメージを更新する際はリポジトリの distro 名も合わせて確認すること
 RUN apt-get update && \
     apt-get install -y --no-install-recommends curl gnupg && \
     curl -fsSL https://packagecloud.io/ookla/speedtest-cli/gpgkey | gpg --dearmor -o /usr/share/keyrings/ookla-speedtest.gpg && \
