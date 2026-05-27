@@ -1,0 +1,20 @@
+apiVersion: monitoring.coreos.com/v1
+kind: PrometheusRule
+metadata:
+  name: speedtest-alerts
+  namespace: monitoring
+  labels:
+    release: kube-prometheus-stack
+spec:
+  groups:
+    - name: speedtest
+      rules:
+        - alert: SpeedtestJobFailed
+          expr: |
+            kube_job_status_failed{namespace="monitoring", job_name=~"speedtest-.*"} > 0
+          for: 0m
+          labels:
+            severity: warning
+          annotations:
+            summary: "Speedtest job {{ $labels.job_name }} failed"
+            description: "Speedtest CronJob で計測エラーが発生しました。\nJob: {{ $labels.job_name }}"

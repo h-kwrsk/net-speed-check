@@ -1,0 +1,53 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: line-adapter
+  namespace: monitoring
+  labels:
+    app: line-adapter
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: line-adapter
+  template:
+    metadata:
+      labels:
+        app: line-adapter
+    spec:
+      containers:
+        - name: line-adapter
+          image: hkwrsk/line-adapter:latest
+          imagePullPolicy: Always
+          ports:
+            - containerPort: 8080
+          env:
+            - name: LINE_CHANNEL_ACCESS_TOKEN
+              valueFrom:
+                secretKeyRef:
+                  name: line-credentials
+                  key: channel-access-token
+            - name: LINE_USER_ID
+              valueFrom:
+                secretKeyRef:
+                  name: line-credentials
+                  key: user-id
+          resources:
+            requests:
+              cpu: 10m
+              memory: 32Mi
+            limits:
+              cpu: 100m
+              memory: 64Mi
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: line-adapter
+  namespace: monitoring
+spec:
+  selector:
+    app: line-adapter
+  ports:
+    - port: 8080
+      targetPort: 8080

@@ -1,0 +1,21 @@
+apiVersion: monitoring.coreos.com/v1alpha1
+kind: AlertmanagerConfig
+metadata:
+  name: speedtest-line
+  namespace: monitoring
+  labels:
+    release: kube-prometheus-stack
+spec:
+  route:
+    receiver: line-webhook
+    groupWait: 10s
+    groupInterval: 5m
+    repeatInterval: 12h
+    matchers:
+      - name: alertname
+        value: SpeedtestJobFailed
+  receivers:
+    - name: line-webhook
+      webhookConfigs:
+        - url: "http://line-adapter.monitoring.svc.cluster.local:8080/webhook"
+          sendResolved: true
