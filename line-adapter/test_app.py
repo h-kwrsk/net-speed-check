@@ -18,9 +18,9 @@ SAMPLE_ALERT = {
 }
 
 
-def make_handler(body_dict: dict) -> WebhookHandler:
-    """WebhookHandler をモックリクエストで生成する"""
-    body = json.dumps(body_dict).encode()
+def make_handler(body_dict: dict | None = None, *, raw_body: bytes | None = None) -> WebhookHandler:
+    """WebhookHandler をモックリクエストで生成する。raw_body を指定すると生バイト列を使う。"""
+    body = raw_body if raw_body is not None else json.dumps(body_dict).encode()
     handler = WebhookHandler.__new__(WebhookHandler)
     handler.headers = {"Content-Length": str(len(body))}
     handler.rfile = io.BytesIO(body)
@@ -134,11 +134,7 @@ class TestWebhookHandler(unittest.TestCase):
     @patch("app.send_line_message")
     def test_empty_body_returns_200(self, mock_send):
         """正常系: Content-Length が 0 のリクエストでも 200 を返し LINE 送信は行わない"""
-        handler = WebhookHandler.__new__(WebhookHandler)
-        handler.headers = {"Content-Length": "0"}
-        handler.rfile = io.BytesIO(b"")
-        handler.send_response = MagicMock()
-        handler.end_headers = MagicMock()
+        handler = make_handler(raw_body=b"")
         handler.do_POST()
         mock_send.assert_not_called()
         handler.send_response.assert_called_once_with(200)
