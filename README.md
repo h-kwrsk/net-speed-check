@@ -40,7 +40,8 @@ Raspberry Pi の Kubernetes クラスタ上でインターネット速度を定�
 ├── line-adapter/
 │   ├── app.py                    # Alertmanager webhook → LINE 転送サービス
 │   ├── test_app.py               # 単体テスト
-│   └── Dockerfile                # ARM64 対応コンテナイメージ
+│   ├── Dockerfile                # ARM64 対応コンテナイメージ
+│   └── requirements.txt          # Python 依存パッケージ
 └── k8s/
     ├── pushgateway.yaml          # Pushgateway Deployment + Service + ServiceMonitor
     ├── cronjob.yaml              # 15分毎に計測を実行する CronJob
