@@ -1,110 +1,164 @@
 """run.py の単体テスト"""
+import json
 import unittest
 from unittest.mock import MagicMock, patch
 
 import run
 
+# Ookla CLI の JSON 出力サンプル（bandwidth は bytes/s）
+SAMPLE_CLI_OUTPUT = json.dumps({
+    "type": "result",
+    "ping": {"latency": 20.0, "jitter": 0.5},
+    "download": {"bandwidth": 25_000_000},
+    "upload": {"bandwidth": 12_500_000},
+    "server": {
+        "name": "Tokyo",
+        "host": "speedtest.example.com",
+        "port": 8080,
+        "country": "Japan",
+    },
+})
 
-# テスト用の計測結果サンプル
+# bytes/s × 8 → bits/s に変換した期待値
 SAMPLE_RESULTS = {
-    "download": 200_000_000.0,  # 200 Mbps in bps
-    "upload": 100_000_000.0,    # 100 Mbps in bps
+    "download": 200_000_000.0,
+    "upload": 100_000_000.0,
     "ping": 20.0,
     "server": {
         "name": "Tokyo",
         "host": "speedtest.example.com:8080",
         "country": "Japan",
-        "sponsor": "Example ISP",
+        "sponsor": "",
     },
 }
 
 
-def make_mock_speedtest(results=SAMPLE_RESULTS):
-    """speedtest.Speedtest のモックを生成する"""
-    st = MagicMock()
-    st.results.dict.return_value = results
-    return st
+def make_proc(stdout=SAMPLE_CLI_OUTPUT, returncode=0, stderr=""):
+    """subprocess.CompletedProcess のモックを生成する"""
+    proc = MagicMock()
+    proc.returncode = returncode
+    proc.stdout = stdout
+    proc.stderr = stderr
+    return proc
+
+
+class TestParseResult(unittest.TestCase):
+
+    def test_extracts_result_from_multiline_output(self):
+        """正常系: type=result 行を複数行出力から正しく抽出する"""
+        ping_line = json.dumps({"type": "ping", "ping": {"latency": 10.0}})
+        result_line = SAMPLE_CLI_OUTPUT
+        output = f"{ping_line}\n{result_line}\n"
+
+        obj = run._parse_result(output)
+
+        self.assertEqual(obj["type"], "result")
+        self.assertEqual(obj["ping"]["latency"], 20.0)
+
+    def test_raises_when_no_result_found(self):
+        """異常系: type=result 行がない場合に RuntimeError が送出される"""
+        output = json.dumps({"type": "ping", "ping": {"latency": 10.0}})
+
+        with self.assertRaises(RuntimeError):
+            run._parse_result(output)
 
 
 class TestRunSpeedtest(unittest.TestCase):
 
-    @patch("run.speedtest.Speedtest")
-    def test_success_on_first_attempt(self, mock_cls):
+    @patch("run.subprocess.run")
+    def test_success_on_first_attempt(self, mock_run):
         """正常系: 1 回目で成功した場合に結果が返る"""
-        mock_cls.return_value = make_mock_speedtest()
+        mock_run.return_value = make_proc()
 
         results = run.run_speedtest()
 
         self.assertEqual(results["download"], SAMPLE_RESULTS["download"])
         self.assertEqual(results["upload"], SAMPLE_RESULTS["upload"])
         self.assertEqual(results["ping"], SAMPLE_RESULTS["ping"])
-        # Speedtest のインスタンスが 1 回だけ生成されていること
-        mock_cls.assert_called_once_with(secure=True)
+        self.assertEqual(results["server"]["host"], "speedtest.example.com:8080")
+        self.assertEqual(results["server"]["sponsor"], "")
+        mock_run.assert_called_once()
 
     @patch("run.time.sleep")
-    @patch("run.speedtest.Speedtest")
-    def test_retry_on_failure_then_success(self, mock_cls, mock_sleep):
+    @patch("run.subprocess.run")
+    def test_retry_on_failure_then_success(self, mock_run, mock_sleep):
         """準正常系: 1 回目が失敗し、2 回目で成功する場合にリトライされる"""
-        mock_cls.side_effect = [
-            Exception("Unable to connect to servers to test latency."),
-            make_mock_speedtest(),
+        mock_run.side_effect = [
+            make_proc(returncode=1, stderr="connection error"),
+            make_proc(),
         ]
 
         results = run.run_speedtest()
 
         self.assertEqual(results["download"], SAMPLE_RESULTS["download"])
-        # 2 回インスタンスが生成されていること
-        self.assertEqual(mock_cls.call_count, 2)
-        # RETRY_DELAY 秒スリープしていること
+        self.assertEqual(mock_run.call_count, 2)
         mock_sleep.assert_called_once_with(run.RETRY_DELAY)
 
     @patch("run.time.sleep")
-    @patch("run.speedtest.Speedtest")
-    def test_retries_on_zero_download(self, mock_cls, mock_sleep):
+    @patch("run.subprocess.run")
+    def test_retries_on_zero_download(self, mock_run, mock_sleep):
         """準正常系: download が 0 の場合にリトライし、次回成功する"""
-        zero_result = {**SAMPLE_RESULTS, "download": 0.0}
-        mock_cls.side_effect = [
-            make_mock_speedtest(zero_result),
-            make_mock_speedtest(),
-        ]
+        zero_output = json.dumps({
+            "type": "result",
+            "ping": {"latency": 20.0},
+            "download": {"bandwidth": 0},
+            "upload": {"bandwidth": 12_500_000},
+            "server": {"name": "Tokyo", "host": "speedtest.example.com", "country": "Japan"},
+        })
+        mock_run.side_effect = [make_proc(stdout=zero_output), make_proc()]
 
         results = run.run_speedtest()
 
         self.assertEqual(results["download"], SAMPLE_RESULTS["download"])
-        self.assertEqual(mock_cls.call_count, 2)
+        self.assertEqual(mock_run.call_count, 2)
         mock_sleep.assert_called_once_with(run.RETRY_DELAY)
 
     @patch("run.time.sleep")
-    @patch("run.speedtest.Speedtest")
-    def test_retries_on_zero_upload(self, mock_cls, mock_sleep):
+    @patch("run.subprocess.run")
+    def test_retries_on_zero_upload(self, mock_run, mock_sleep):
         """準正常系: upload が 0 の場合にリトライし、次回成功する"""
-        zero_result = {**SAMPLE_RESULTS, "upload": 0.0}
-        mock_cls.side_effect = [
-            make_mock_speedtest(zero_result),
-            make_mock_speedtest(),
-        ]
+        zero_output = json.dumps({
+            "type": "result",
+            "ping": {"latency": 20.0},
+            "download": {"bandwidth": 25_000_000},
+            "upload": {"bandwidth": 0},
+            "server": {"name": "Tokyo", "host": "speedtest.example.com", "country": "Japan"},
+        })
+        mock_run.side_effect = [make_proc(stdout=zero_output), make_proc()]
 
         results = run.run_speedtest()
 
         self.assertEqual(results["upload"], SAMPLE_RESULTS["upload"])
-        self.assertEqual(mock_cls.call_count, 2)
+        self.assertEqual(mock_run.call_count, 2)
         mock_sleep.assert_called_once_with(run.RETRY_DELAY)
 
     @patch("run.time.sleep")
-    @patch("run.speedtest.Speedtest")
-    def test_raises_after_max_retries(self, mock_cls, mock_sleep):
+    @patch("run.subprocess.run")
+    def test_raises_after_max_retries(self, mock_run, mock_sleep):
         """異常系: MAX_RETRIES 回すべて失敗した場合に例外が送出される"""
-        error = Exception("Unable to connect to servers to test latency.")
-        mock_cls.side_effect = error
+        mock_run.return_value = make_proc(returncode=1, stderr="connection refused")
 
-        with self.assertRaises(Exception) as ctx:
+        with self.assertRaises(Exception):
             run.run_speedtest()
 
-        self.assertEqual(str(ctx.exception), str(error))
-        # MAX_RETRIES 回試みていること
-        self.assertEqual(mock_cls.call_count, run.MAX_RETRIES)
-        # 最後の試行ではスリープしないこと
+        self.assertEqual(mock_run.call_count, run.MAX_RETRIES)
         self.assertEqual(mock_sleep.call_count, run.MAX_RETRIES - 1)
+
+    @patch("run.subprocess.run")
+    def test_host_without_port(self, mock_run):
+        """正常系: server に port がない場合は host のみを使う"""
+        output = json.dumps({
+            "type": "result",
+            "ping": {"latency": 10.0},
+            "download": {"bandwidth": 25_000_000},
+            "upload": {"bandwidth": 12_500_000},
+            "server": {"name": "Osaka", "host": "osaka.example.com", "country": "Japan"},
+        })
+        mock_run.return_value = make_proc(stdout=output)
+
+        results = run.run_speedtest()
+
+        self.assertEqual(results["server"]["host"], "osaka.example.com")
 
 
 class TestPushMetrics(unittest.TestCase):
@@ -119,7 +173,6 @@ class TestPushMetrics(unittest.TestCase):
         self.assertEqual(kwargs["job"], "speedtest")
         self.assertEqual(kwargs["grouping_key"], {"instance": run.INSTANCE})
 
-        # registry 内のメトリクス値を検証する
         registry = kwargs["registry"]
         metrics = {m.name: m for m in registry.collect()}
         self.assertAlmostEqual(
@@ -134,16 +187,6 @@ class TestPushMetrics(unittest.TestCase):
             list(metrics["speedtest_ping_latency_milliseconds"].samples)[0].value,
             SAMPLE_RESULTS["ping"],
         )
-
-    @patch("run.push_to_gateway")
-    def test_sponsor_defaults_to_empty_string(self, mock_push):
-        """正常系: server に sponsor キーがなくても空文字列で補完される"""
-        results = {**SAMPLE_RESULTS, "server": {**SAMPLE_RESULTS["server"]}}
-        del results["server"]["sponsor"]
-
-        # 例外が発生しないこと
-        run.push_metrics(results)
-        mock_push.assert_called_once()
 
     @patch("run.push_to_gateway", side_effect=Exception("connection refused"))
     def test_raises_on_pushgateway_error(self, _mock_push):
