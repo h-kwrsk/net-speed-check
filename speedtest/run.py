@@ -24,7 +24,7 @@ MAX_RETRIES = int(os.environ.get("SPEEDTEST_MAX_RETRIES", "3"))
 RETRY_DELAY = int(os.environ.get("SPEEDTEST_RETRY_DELAY", "30"))  # seconds
 
 
-def _parse_result(stdout: str) -> dict:
+def _parse_result(stdout: str) -> dict[str, object]:
     """speedtest CLI の JSON 出力から type=result のオブジェクトを抽出する。
     CLI は計測段階ごとに複数行の JSON を出力するため、最終結果行を探す。
     """
@@ -38,7 +38,7 @@ def _parse_result(stdout: str) -> dict:
     raise RuntimeError(f"No result found in speedtest output: {stdout[:200]}")
 
 
-def run_speedtest():
+def run_speedtest() -> dict[str, object]:
     """速度計測を実行して結果の dict を返す。失敗した場合は MAX_RETRIES 回リトライする。"""
     last_error = None
     for attempt in range(1, MAX_RETRIES + 1):
@@ -103,7 +103,7 @@ def run_speedtest():
     raise last_error
 
 
-def push_metrics(results):
+def push_metrics(results: dict[str, object]) -> None:
     """計測結果を Prometheus メトリクスに変換して Pushgateway へ送信する。
 
     push_to_gateway() を使うことで、同一 job+instance の古いメトリクスを
@@ -158,7 +158,7 @@ def push_metrics(results):
     log.info("Metrics pushed successfully.")
 
 
-def main():
+def main() -> None:
     try:
         results = run_speedtest()
     except Exception as e:

@@ -25,7 +25,7 @@ def send_line_message(text: str) -> None:
     resp.raise_for_status()
 
 
-def format_message(alert: dict) -> str:
+def format_message(alert: dict[str, object]) -> str:
     status = "FIRING" if alert["status"] == "firing" else "RESOLVED"
     alertname = alert["labels"].get("alertname", "unknown")
     job_name = alert["labels"].get("job_name", "")
