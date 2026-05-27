@@ -37,9 +37,11 @@ def run_speedtest():
             log.info("Running download test...")
             st.download()
 
-            log.info("Running upload test...")
-            # Raspberry Pi ではマルチスレッド upload が 0 Mbps を返すため threads=1 に固定する
-            st.upload(threads=1)
+            # 奇数回は threads=1、偶数回はデフォルト(None)を交互に試す。
+            # Raspberry Pi でマルチスレッド upload が 0 Mbps を返す問題を軽減するため。
+            upload_threads = 1 if attempt % 2 == 1 else None
+            log.info("Running upload test... (threads=%s)", upload_threads)
+            st.upload(threads=upload_threads)
 
             results = st.results.dict()
 
