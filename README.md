@@ -32,12 +32,14 @@ Raspberry Pi の Kubernetes クラスタ上でインターネット速度を定�
 
 ```text
 .
-├── run.py                        # 速度計測 & Pushgateway 送信スクリプト
-├── test_run.py                   # 単体テスト
-├── Dockerfile                    # ARM64 対応コンテナイメージ
-├── requirements.txt              # Python 依存パッケージ
+├── speedtest/
+│   ├── run.py                    # 速度計測 & Pushgateway 送信スクリプト
+│   ├── test_run.py               # 単体テスト
+│   ├── Dockerfile                # ARM64 対応コンテナイメージ
+│   └── requirements.txt          # Python 依存パッケージ
 ├── line-adapter/
 │   ├── app.py                    # Alertmanager webhook → LINE 転送サービス
+│   ├── test_app.py               # 単体テスト
 │   └── Dockerfile                # ARM64 対応コンテナイメージ
 └── k8s/
     ├── pushgateway.yaml          # Pushgateway Deployment + Service + ServiceMonitor
@@ -66,7 +68,7 @@ docker buildx create --name rpibuilder --use
 docker buildx build \
   --platform linux/arm64 \
   -t <DOCKERHUB_USERNAME>/net-speed-check:latest \
-  --push .
+  --push speedtest/
 
 # LINE 通知アダプター
 docker buildx build \
@@ -150,8 +152,9 @@ kubectl run curl-test --image=curlimages/curl:latest --rm --restart=Never -n mon
 ### テストの実行
 
 ```bash
-pip install -r requirements.txt
-python -m pytest test_run.py -v
+pip install -r speedtest/requirements.txt
+python -m pytest speedtest/test_run.py -v
+python -m pytest line-adapter/test_app.py -v
 ```
 
 ### 設定できる環境変数
