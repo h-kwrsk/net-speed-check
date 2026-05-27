@@ -11,7 +11,7 @@ Raspberry Pi の Kubernetes クラスタ上でインターネット速度を定�
 [CronJob (15分毎)]
        |
    run.py
- (speedtest-cli)
+ (Ookla speedtest CLI)
        |
   push metrics
        |
@@ -116,13 +116,10 @@ ssh raspi-master.local "kubectl logs -n monitoring job/speedtest-manual"
 正常時の出力例:
 
 ```text
-2026-05-04 17:18:58,330 INFO Initializing speedtest client... (attempt 1/3)
-2026-05-04 17:18:59,340 INFO Selecting best server...
-2026-05-04 17:19:00,232 INFO Running download test...
-2026-05-04 17:19:10,074 INFO Running upload test... (threads=1)
-2026-05-04 17:19:14,032 INFO Results: download=332.79 Mbps, upload=349.51 Mbps, ping=18.66 ms, server=Tokyo (Japan)
-2026-05-04 17:19:14,033 INFO Pushing metrics to http://pushgateway.monitoring.svc.cluster.local:9091 ...
-2026-05-04 17:19:14,061 INFO Metrics pushed successfully.
+2026-05-27 16:12:23,940 INFO Running speedtest... (attempt 1/3)
+2026-05-27 16:12:54,212 INFO Results: download=419.19 Mbps, upload=408.79 Mbps, ping=12.34 ms, server=Allied Telesis Capital Corporation (Japan)
+2026-05-27 16:12:54,213 INFO Pushing metrics to http://pushgateway.monitoring.svc.cluster.local:9091 ...
+2026-05-27 16:12:54,306 INFO Metrics pushed successfully.
 ```
 
 ### Grafana ダッシュボード
