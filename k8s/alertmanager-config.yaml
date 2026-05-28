@@ -8,6 +8,8 @@ metadata:
 spec:
   route:
     receiver: line-webhook
+    # alertname のみでグループ化することで、複数の失敗 Job が履歴に残っていても LINE 通知は 1 通にまとめる
+    groupBy: ['alertname']
     groupWait: 10s
     groupInterval: 5m
     # 失敗 Job は failedJobsHistoryLimit の間メトリクスに残り続けるため、再通知を抑制する
