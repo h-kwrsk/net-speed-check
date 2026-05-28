@@ -23,6 +23,10 @@ INSTANCE = os.environ.get("SPEEDTEST_INSTANCE", "raspi-cluster")
 MAX_RETRIES = int(os.environ.get("SPEEDTEST_MAX_RETRIES", "3"))
 RETRY_DELAY = int(os.environ.get("SPEEDTEST_RETRY_DELAY", "30"))  # seconds
 
+# 品質の低いサーバーに接続した場合の結果を除外するための下限閾値
+# 通常値 400〜470 Mbps に対して 1/8 程度を設定
+MIN_SPEED_MBPS = float(os.environ.get("SPEEDTEST_MIN_SPEED_MBPS", "50"))
+
 
 def _parse_result(stdout: str) -> dict[str, object]:
     """speedtest CLI の JSON 出力から type=result のオブジェクトを抽出する。
@@ -81,6 +85,14 @@ def run_speedtest() -> dict[str, object]:
             if results["download"] == 0 or results["upload"] == 0:
                 raise ValueError(
                     f"Invalid result: download={results['download'] / 1e6:.2f} Mbps, "
+                    f"upload={results['upload'] / 1e6:.2f} Mbps"
+                )
+
+            # MIN_SPEED_MBPS 未満は品質不良とみなしてリトライする
+            if results["download"] < MIN_SPEED_MBPS * 1e6 or results["upload"] < MIN_SPEED_MBPS * 1e6:
+                raise ValueError(
+                    f"Speed below threshold ({MIN_SPEED_MBPS:.0f} Mbps): "
+                    f"download={results['download'] / 1e6:.2f} Mbps, "
                     f"upload={results['upload'] / 1e6:.2f} Mbps"
                 )
 

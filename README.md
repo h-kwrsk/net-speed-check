@@ -166,6 +166,7 @@ python -m pytest line-adapter/test_app.py -v
 | `SPEEDTEST_INSTANCE` | `raspi-cluster` | Prometheus の `instance` ラベルに使う識別子 |
 | `SPEEDTEST_MAX_RETRIES` | `3` | 計測失敗時の最大リトライ回数 |
 | `SPEEDTEST_RETRY_DELAY` | `30` | リトライ間隔（秒） |
+| `SPEEDTEST_MIN_SPEED_MBPS` | `50` | この値（Mbps）未満の計測結果はリトライ対象とする下限閾値 |
 
 ## 収集するメトリクス
 

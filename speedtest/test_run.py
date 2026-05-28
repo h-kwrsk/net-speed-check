@@ -145,6 +145,44 @@ class TestRunSpeedtest(unittest.TestCase):
         self.assertEqual(mock_run.call_count, run.MAX_RETRIES)
         self.assertEqual(mock_sleep.call_count, run.MAX_RETRIES - 1)
 
+    @patch("run.time.sleep")
+    @patch("run.subprocess.run")
+    def test_retries_on_low_download(self, mock_run, mock_sleep):
+        """準正常系: download が MIN_SPEED_MBPS 未満の場合にリトライし、次回成功する"""
+        low_output = json.dumps({
+            "type": "result",
+            "ping": {"latency": 20.0},
+            "download": {"bandwidth": int(run.MIN_SPEED_MBPS * 1e6 / 8) - 1},  # bytes/s
+            "upload": {"bandwidth": 12_500_000},
+            "server": {"name": "Tokyo", "host": "speedtest.example.com", "country": "Japan"},
+        })
+        mock_run.side_effect = [make_proc(stdout=low_output), make_proc()]
+
+        results = run.run_speedtest()
+
+        self.assertEqual(results["download"], SAMPLE_RESULTS["download"])
+        self.assertEqual(mock_run.call_count, 2)
+        mock_sleep.assert_called_once_with(run.RETRY_DELAY)
+
+    @patch("run.time.sleep")
+    @patch("run.subprocess.run")
+    def test_retries_on_low_upload(self, mock_run, mock_sleep):
+        """準正常系: upload が MIN_SPEED_MBPS 未満の場合にリトライし、次回成功する"""
+        low_output = json.dumps({
+            "type": "result",
+            "ping": {"latency": 20.0},
+            "download": {"bandwidth": 25_000_000},
+            "upload": {"bandwidth": int(run.MIN_SPEED_MBPS * 1e6 / 8) - 1},  # bytes/s
+            "server": {"name": "Tokyo", "host": "speedtest.example.com", "country": "Japan"},
+        })
+        mock_run.side_effect = [make_proc(stdout=low_output), make_proc()]
+
+        results = run.run_speedtest()
+
+        self.assertEqual(results["upload"], SAMPLE_RESULTS["upload"])
+        self.assertEqual(mock_run.call_count, 2)
+        mock_sleep.assert_called_once_with(run.RETRY_DELAY)
+
     @patch("run.subprocess.run")
     def test_host_without_port(self, mock_run):
         """正常系: server に port がない場合は host のみを使う"""
