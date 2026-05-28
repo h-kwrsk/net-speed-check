@@ -167,6 +167,7 @@ python -m pytest line-adapter/test_app.py -v
 | `SPEEDTEST_MAX_RETRIES` | `3` | 計測失敗時の最大リトライ回数 |
 | `SPEEDTEST_RETRY_DELAY` | `30` | リトライ間隔（秒） |
 | `SPEEDTEST_MIN_SPEED_MBPS` | `50` | この値（Mbps）未満の計測結果はリトライ対象とする下限閾値 |
+| `SPEEDTEST_SERVER_ID` | （未設定） | 接続するサーバーの ID（未設定時は自動選択）。`speedtest --list` で確認可能 |
 
 ## 収集するメトリクス
 

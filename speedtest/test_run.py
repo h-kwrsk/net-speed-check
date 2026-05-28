@@ -79,6 +79,29 @@ class TestRunSpeedtest(unittest.TestCase):
         self.assertEqual(results["server"]["sponsor"], "")
         mock_run.assert_called_once()
 
+    @patch("run.SERVER_ID", "48463")
+    @patch("run.subprocess.run")
+    def test_server_id_passed_when_set(self, mock_run):
+        """正常系: SERVER_ID が設定されている場合に --server-id が渡される"""
+        mock_run.return_value = make_proc()
+
+        run.run_speedtest()
+
+        args = mock_run.call_args[0][0]
+        self.assertIn("--server-id", args)
+        self.assertIn("48463", args)
+
+    @patch("run.SERVER_ID", "")
+    @patch("run.subprocess.run")
+    def test_server_id_not_passed_when_empty(self, mock_run):
+        """正常系: SERVER_ID が未設定の場合に --server-id が渡されない"""
+        mock_run.return_value = make_proc()
+
+        run.run_speedtest()
+
+        args = mock_run.call_args[0][0]
+        self.assertNotIn("--server-id", args)
+
     @patch("run.time.sleep")
     @patch("run.subprocess.run")
     def test_retry_on_failure_then_success(self, mock_run, mock_sleep):
