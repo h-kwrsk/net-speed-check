@@ -27,6 +27,10 @@ RETRY_DELAY = int(os.environ.get("SPEEDTEST_RETRY_DELAY", "30"))  # seconds
 # 通常値 400〜470 Mbps に対して 1/8 程度を設定
 MIN_SPEED_MBPS = float(os.environ.get("SPEEDTEST_MIN_SPEED_MBPS", "50"))
 
+# 計測サーバーを固定することで、サーバー起因のブレを排除して一貫した計測を行う
+# 未設定時は Ookla CLI がレイテンシ最小のサーバーを自動選択する
+SERVER_ID = os.environ.get("SPEEDTEST_SERVER_ID", "")
+
 
 def _parse_result(stdout: str) -> dict[str, object]:
     """speedtest CLI の JSON 出力から type=result のオブジェクトを抽出する。
@@ -48,8 +52,11 @@ def run_speedtest() -> dict[str, object]:
     for attempt in range(1, MAX_RETRIES + 1):
         try:
             log.info("Running speedtest... (attempt %d/%d)", attempt, MAX_RETRIES)
+            cmd = ["speedtest", "--format=json", "--accept-license", "--accept-gdpr"]
+            if SERVER_ID:
+                cmd += ["--server-id", SERVER_ID]
             proc = subprocess.run(
-                ["speedtest", "--format=json", "--accept-license", "--accept-gdpr"],
+                cmd,
                 capture_output=True,
                 text=True,
                 timeout=120,

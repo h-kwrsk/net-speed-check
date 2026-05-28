@@ -29,6 +29,8 @@ spec:
                   value: "http://pushgateway.monitoring.svc.cluster.local:9091"
                 - name: SPEEDTEST_INSTANCE
                   value: "raspi-cluster"
+                - name: SPEEDTEST_SERVER_ID
+                  value: "48463"  # IPA CyberLab 400G (Tokyo)
               resources:
                 requests:
                   cpu: 100m
