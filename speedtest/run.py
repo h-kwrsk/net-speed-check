@@ -47,14 +47,27 @@ def _parse_result(stdout: str) -> dict[str, object]:
 
 
 def run_speedtest() -> dict[str, object]:
-    """速度計測を実行して結果の dict を返す。失敗した場合は MAX_RETRIES 回リトライする。"""
+    """速度計測を実行して結果の dict を返す。失敗した場合は MAX_RETRIES 回リトライする。
+
+    SERVER_ID が設定されている場合、固定サーバーで MAX_RETRIES 回試みた後、
+    すべて失敗したら自動選択で 1 回フォールバックする。
+    """
     last_error = None
-    for attempt in range(1, MAX_RETRIES + 1):
+    # SERVER_ID が設定されている場合: [固定 × MAX_RETRIES, 自動選択 × 1]
+    # 未設定の場合:                  [自動選択 × MAX_RETRIES]
+    server_ids: list[str] = [SERVER_ID] * MAX_RETRIES + ([""] if SERVER_ID else [])
+    total = len(server_ids)
+
+    for attempt, server_id in enumerate(server_ids, 1):
+        is_fallback = SERVER_ID and not server_id
         try:
-            log.info("Running speedtest... (attempt %d/%d)", attempt, MAX_RETRIES)
+            if is_fallback:
+                log.info("Running speedtest... (attempt %d/%d, auto-select fallback)", attempt, total)
+            else:
+                log.info("Running speedtest... (attempt %d/%d)", attempt, total)
             cmd = ["speedtest", "--format=json", "--accept-license", "--accept-gdpr"]
-            if SERVER_ID:
-                cmd += ["--server-id", SERVER_ID]
+            if server_id:
+                cmd += ["--server-id", server_id]
             proc = subprocess.run(
                 cmd,
                 capture_output=True,
@@ -114,8 +127,8 @@ def run_speedtest() -> dict[str, object]:
             return results
         except Exception as e:
             last_error = e
-            log.warning("Attempt %d/%d failed: %s", attempt, MAX_RETRIES, e)
-            if attempt < MAX_RETRIES:
+            log.warning("Attempt %d/%d failed: %s", attempt, total, e)
+            if attempt < total:
                 log.info("Retrying in %d seconds...", RETRY_DELAY)
                 time.sleep(RETRY_DELAY)
 

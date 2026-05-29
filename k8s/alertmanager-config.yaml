@@ -12,8 +12,8 @@ spec:
     groupBy: ['alertname']
     groupWait: 10s
     groupInterval: 5m
-    # 失敗 Job は failedJobsHistoryLimit の間メトリクスに残り続けるため、再通知を抑制する
-    repeatInterval: 12h
+    # 再通知は不要なため実質無効化（8760h = 1年）
+    repeatInterval: 8760h
     matchers:
       - name: alertname
         value: SpeedtestJobFailed
