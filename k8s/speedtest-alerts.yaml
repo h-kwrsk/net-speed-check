@@ -22,3 +22,34 @@ spec:
           annotations:
             summary: "Speedtest job {{ $labels.job_name }} failed"
             description: "Speedtest CronJob で計測エラーが発生しました。\nJob: {{ $labels.job_name }}"
+
+        - alert: SpeedtestDataStale
+          expr: |
+            (time() - push_time_seconds{job="speedtest", instance="raspi-cluster"}) > 3600
+          # 即時発火: 15 分ごとの CronJob が 4 サイクル以上沈黙している状態を検知する
+          for: 0m
+          labels:
+            severity: warning
+          annotations:
+            summary: "Speedtest data has not been updated for over 1 hour"
+            description: "Speedtest のデータが 1 時間以上更新されていません。CronJob または Pushgateway に問題がある可能性があります。"
+
+        - alert: SpeedtestLowDownloadSpeed
+          expr: |
+            speedtest_download_bits_per_second{job="speedtest", instance="raspi-cluster"} < 100000000
+          for: 0m
+          labels:
+            severity: warning
+          annotations:
+            summary: "Speedtest download speed is below 100 Mbps"
+            description: "ダウンロード速度が 100 Mbps を下回っています（現在値: {{ $value | humanize }}bps）"
+
+        - alert: SpeedtestLowUploadSpeed
+          expr: |
+            speedtest_upload_bits_per_second{job="speedtest", instance="raspi-cluster"} < 100000000
+          for: 0m
+          labels:
+            severity: warning
+          annotations:
+            summary: "Speedtest upload speed is below 100 Mbps"
+            description: "アップロード速度が 100 Mbps を下回っています（現在値: {{ $value | humanize }}bps）"
