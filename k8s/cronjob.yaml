@@ -14,6 +14,7 @@ spec:
   jobTemplate:
     spec:
       backoffLimit: 0
+      ttlSecondsAfterFinished: 432000  # 5日後に自動削除
       template:
         metadata:
           labels:
