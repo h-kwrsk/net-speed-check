@@ -16,7 +16,8 @@ spec:
     repeatInterval: 8760h
     matchers:
       - name: alertname
-        value: SpeedtestJobFailed
+        matchType: =~
+        value: "Speedtest.*"
   receivers:
     - name: line-webhook
       webhookConfigs:

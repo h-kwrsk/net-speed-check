@@ -47,7 +47,7 @@ Raspberry Pi の Kubernetes クラスタ上でインターネット速度を定�
     ├── cronjob.yaml              # 15分毎に計測を実行する CronJob
     ├── grafana-dashboard.yaml    # Grafana ダッシュボード (ConfigMap)
     ├── line-adapter.yaml         # line-adapter Deployment + Service
-    ├── speedtest-alerts.yaml     # PrometheusRule（Job 失敗検知）
+    ├── speedtest-alerts.yaml     # PrometheusRule（アラートルール）
     └── alertmanager-config.yaml  # AlertmanagerConfig（LINE へルーティング）
 ```
 
@@ -116,11 +116,11 @@ ssh raspi-master.local \
 ssh raspi-master.local "kubectl logs -n monitoring job/speedtest-manual"
 ```
 
-正常時の出力例:
+正常時の出力例（`SPEEDTEST_SERVER_ID` 設定時は `attempt 1/4`、未設定時は `attempt 1/3`）:
 
 ```text
-2026-05-27 16:12:23,940 INFO Running speedtest... (attempt 1/3)
-2026-05-27 16:12:54,212 INFO Results: download=419.19 Mbps, upload=408.79 Mbps, ping=12.34 ms, server=Allied Telesis Capital Corporation (Japan)
+2026-05-27 16:12:23,940 INFO Running speedtest... (attempt 1/4)
+2026-05-27 16:12:54,212 INFO Results: download=457.84 Mbps, upload=453.46 Mbps, ping=12.65 ms, server=IPA CyberLab 400G (Japan)
 2026-05-27 16:12:54,213 INFO Pushing metrics to http://pushgateway.monitoring.svc.cluster.local:9091 ...
 2026-05-27 16:12:54,306 INFO Metrics pushed successfully.
 ```
@@ -168,6 +168,23 @@ python -m pytest line-adapter/test_app.py -v
 | `SPEEDTEST_RETRY_DELAY` | `30` | リトライ間隔（秒） |
 | `SPEEDTEST_MIN_SPEED_MBPS` | `50` | この値（Mbps）未満の計測結果はリトライ対象とする下限閾値 |
 | `SPEEDTEST_SERVER_ID` | （未設定） | 接続するサーバーの ID（未設定時は自動選択）。`speedtest --list` で確認可能 |
+
+## アラート
+
+Alertmanager 経由で LINE に通知されるアラートの一覧です。すべて `Speedtest.*` にマッチするため、追加しても自動でルーティングされます。
+
+| アラート名 | 条件 | 説明 |
+| --- | --- | --- |
+| `SpeedtestJobFailed` | Job 失敗 かつ 作成から 30 分以内 | CronJob の計測・送信エラー。30 分後に自動解消 |
+| `SpeedtestDataStale` | 最終 push から 1 時間以上経過 | CronJob 停止・Pushgateway 障害など Job 失敗では検知できない異常 |
+| `SpeedtestLowDownloadSpeed` | DL < 100 Mbps | ダウンロード速度の低下 |
+| `SpeedtestLowUploadSpeed` | UL < 100 Mbps | アップロード速度の低下 |
+
+### LINE 通知ログの確認
+
+```bash
+ssh raspi-master.local "kubectl logs -n monitoring deployment/line-adapter --tail=50"
+```
 
 ## 収集するメトリクス
 
