@@ -13,7 +13,9 @@ spec:
         - alert: SpeedtestJobFailed
           expr: |
             kube_job_status_failed{namespace="monitoring", job_name=~"speedtest-.*"} > 0
-          # 即時発火: 失敗 Job は履歴に短期間しか残らないため待機時間を設けない
+            and on(job_name)
+            (time() - kube_job_created{namespace="monitoring", job_name=~"speedtest-.*"}) < 1800
+          # 即時発火: Job 失敗から 30 分以内のみ Firing とし、Job 削除なしで自動解消する
           for: 0m
           labels:
             severity: warning
