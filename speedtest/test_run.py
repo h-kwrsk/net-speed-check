@@ -155,10 +155,11 @@ class TestRunSpeedtest(unittest.TestCase):
         self.assertEqual(mock_run.call_count, 2)
         mock_sleep.assert_called_once_with(run.RETRY_DELAY)
 
+    @patch("run.SERVER_ID", "")
     @patch("run.time.sleep")
     @patch("run.subprocess.run")
     def test_raises_after_max_retries(self, mock_run, mock_sleep):
-        """異常系: MAX_RETRIES 回すべて失敗した場合に例外が送出される"""
+        """異常系: SERVER_ID 未設定で MAX_RETRIES 回すべて失敗した場合に例外が送出される"""
         mock_run.return_value = make_proc(returncode=1, stderr="connection refused")
 
         with self.assertRaises(RuntimeError) as ctx:
@@ -167,6 +168,42 @@ class TestRunSpeedtest(unittest.TestCase):
         self.assertIn("connection refused", str(ctx.exception))
         self.assertEqual(mock_run.call_count, run.MAX_RETRIES)
         self.assertEqual(mock_sleep.call_count, run.MAX_RETRIES - 1)
+
+    @patch("run.SERVER_ID", "48463")
+    @patch("run.time.sleep")
+    @patch("run.subprocess.run")
+    def test_fallback_to_auto_select_when_fixed_server_fails(self, mock_run, mock_sleep):
+        """準正常系: 固定サーバーが MAX_RETRIES 回失敗した場合、自動選択にフォールバックして成功する"""
+        mock_run.side_effect = [
+            make_proc(returncode=1, stderr="server unavailable"),
+            make_proc(returncode=1, stderr="server unavailable"),
+            make_proc(returncode=1, stderr="server unavailable"),
+            make_proc(),  # 自動選択フォールバックで成功
+        ]
+
+        results = run.run_speedtest()
+
+        self.assertEqual(results["download"], SAMPLE_RESULTS["download"])
+        self.assertEqual(mock_run.call_count, run.MAX_RETRIES + 1)
+        # 最後の呼び出しに --server-id が含まれないこと
+        last_args = mock_run.call_args_list[-1][0][0]
+        self.assertNotIn("--server-id", last_args)
+        # 最初の呼び出しに --server-id が含まれること
+        first_args = mock_run.call_args_list[0][0][0]
+        self.assertIn("--server-id", first_args)
+        self.assertIn("48463", first_args)
+
+    @patch("run.SERVER_ID", "48463")
+    @patch("run.time.sleep")
+    @patch("run.subprocess.run")
+    def test_raises_when_fixed_server_and_fallback_both_fail(self, mock_run, mock_sleep):
+        """異常系: 固定サーバーと自動選択フォールバックがすべて失敗した場合に例外が送出される"""
+        mock_run.return_value = make_proc(returncode=1, stderr="all unavailable")
+
+        with self.assertRaises(RuntimeError):
+            run.run_speedtest()
+
+        self.assertEqual(mock_run.call_count, run.MAX_RETRIES + 1)  # 固定 3 回 + フォールバック 1 回
 
     @patch("run.time.sleep")
     @patch("run.subprocess.run")
