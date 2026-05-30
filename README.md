@@ -177,8 +177,8 @@ Alertmanager 経由で LINE に通知されるアラートの一覧です。す�
 | --- | --- | --- |
 | `SpeedtestJobFailed` | Job 失敗 かつ 作成から 30 分以内 | CronJob の計測・送信エラー。30 分後に自動解消 |
 | `SpeedtestDataStale` | 最終 push から 1 時間以上経過 | CronJob 停止・Pushgateway 障害など Job 失敗では検知できない異常 |
-| `SpeedtestLowDownloadSpeed` | DL < 100 Mbps | ダウンロード速度の低下 |
-| `SpeedtestLowUploadSpeed` | UL < 100 Mbps | アップロード速度の低下 |
+| `SpeedtestLowDownloadSpeed` | DL < 50 Mbps | ダウンロード速度の低下 |
+| `SpeedtestLowUploadSpeed` | UL < 50 Mbps | アップロード速度の低下 |
 
 ### LINE 通知ログの確認
 
