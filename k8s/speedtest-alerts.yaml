@@ -36,20 +36,20 @@ spec:
 
         - alert: SpeedtestLowDownloadSpeed
           expr: |
-            speedtest_download_bits_per_second{job="speedtest", instance="raspi-cluster"} < 100000000
+            speedtest_download_bits_per_second{job="speedtest", instance="raspi-cluster"} < 50000000
           for: 0m
           labels:
             severity: warning
           annotations:
-            summary: "Speedtest download speed is below 100 Mbps"
-            description: "ダウンロード速度が 100 Mbps を下回っています（現在値: {{ $value | humanize }}bps）"
+            summary: "Speedtest download speed is below 50 Mbps"
+            description: "ダウンロード速度が 50 Mbps を下回っています（現在値: {{ $value | humanize }}bps）"
 
         - alert: SpeedtestLowUploadSpeed
           expr: |
-            speedtest_upload_bits_per_second{job="speedtest", instance="raspi-cluster"} < 100000000
+            speedtest_upload_bits_per_second{job="speedtest", instance="raspi-cluster"} < 50000000
           for: 0m
           labels:
             severity: warning
           annotations:
-            summary: "Speedtest upload speed is below 100 Mbps"
-            description: "アップロード速度が 100 Mbps を下回っています（現在値: {{ $value | humanize }}bps）"
+            summary: "Speedtest upload speed is below 50 Mbps"
+            description: "アップロード速度が 50 Mbps を下回っています（現在値: {{ $value | humanize }}bps）"
