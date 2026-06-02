@@ -1,0 +1,15 @@
+grafana:
+  # 組み込みダッシュボード（Node / Pod メトリクス等）のタイムゾーンを JST に設定
+  defaultDashboardsTimezone: Asia/Tokyo
+  grafana.ini:
+    date_formats:
+      default_timezone: Asia/Tokyo
+  service:
+    type: NodePort
+    nodePort: 32000
+  # ローリングアップデート時にゼロダウンタイムを保証する
+  deploymentStrategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxUnavailable: 0
+      maxSurge: 1
