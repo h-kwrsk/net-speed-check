@@ -43,6 +43,7 @@ Raspberry Pi の Kubernetes クラスタ上でインターネット速度を定�
 │   ├── Dockerfile                # ARM64 対応コンテナイメージ
 │   └── requirements.txt          # Python 依存パッケージ
 └── k8s/
+    ├── helm-values.yaml          # kube-prometheus-stack Helm values
     ├── pushgateway.yaml          # Pushgateway Deployment + Service + ServiceMonitor
     ├── cronjob.yaml              # 15分毎に計測を実行する CronJob
     ├── grafana-dashboard.yaml    # Grafana ダッシュボード (ConfigMap)
@@ -98,7 +99,16 @@ kubectl create secret generic line-credentials \
 
 ```bash
 scp -r k8s/ raspi-master.local:~/net-speed-check/
-ssh raspi-master.local "kubectl apply -f ~/net-speed-check/k8s/"
+
+# kube-prometheus-stack の Helm values を適用
+ssh raspi-master.local "helm upgrade kube-prometheus-stack kube-prometheus-stack \
+  --repo https://prometheus-community.github.io/helm-charts \
+  --version 79.7.1 -n monitoring \
+  -f ~/net-speed-check/k8s/helm-values.yaml"
+
+# その他のマニフェストを適用
+ssh raspi-master.local "kubectl apply -f ~/net-speed-check/k8s/ \
+  --selector='!helm.sh/chart'"
 ```
 
 ## 動作確認
