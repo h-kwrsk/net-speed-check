@@ -13,3 +13,12 @@ grafana:
     rollingUpdate:
       maxUnavailable: 0
       maxSurge: 1
+  # local-path はノードローカルのため、PVC を作成したノードに固定する
+  nodeSelector:
+    kubernetes.io/hostname: raspi-worker2
+  persistence:
+    enabled: true
+    storageClassName: local-path
+    size: 1Gi
+    accessModes:
+      - ReadWriteOnce
