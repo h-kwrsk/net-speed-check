@@ -55,6 +55,7 @@ Raspberry Pi の Kubernetes クラスタ上でインターネット速度を定�
 ## 前提条件
 
 - Kubernetes クラスタ（ARM64）に [`kube-prometheus-stack`](https://github.com/prometheus-community/helm-charts/tree/main/charts/kube-prometheus-stack) が導入済みであること
+- [`local-path-provisioner`](https://github.com/rancher/local-path-provisioner) が導入済みであること（Grafana の永続ストレージに使用）
 - Docker Desktop（`docker buildx` が使えること）
 - Docker Hub アカウント
 
