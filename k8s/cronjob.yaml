@@ -6,7 +6,8 @@ metadata:
   labels:
     app: speedtest
 spec:
-  schedule: "*/15 * * * *"
+  # Ookla のレート制限（exit 173）を避けるため 30 分間隔とする
+  schedule: "*/30 * * * *"
   concurrencyPolicy: Forbid
   startingDeadlineSeconds: 60
   successfulJobsHistoryLimit: 3

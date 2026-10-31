@@ -172,6 +172,64 @@ class TestRunSpeedtest(unittest.TestCase):
     @patch("run.SERVER_ID", "48463")
     @patch("run.time.sleep")
     @patch("run.subprocess.run")
+    def test_no_retry_on_rate_limit(self, mock_run, mock_sleep):
+        """異常系: レート制限（exit 173）時はリトライ・フォールバックせず即座に例外が送出される"""
+        mock_run.return_value = make_proc(returncode=173, stderr="Limit reached: Too many requests received.")
+
+        with self.assertRaises(run.RateLimitError) as ctx:
+            run.run_speedtest()
+
+        self.assertIn("Limit reached", str(ctx.exception))
+        mock_run.assert_called_once()
+        mock_sleep.assert_not_called()
+
+    @patch("run.SERVER_ID", "")
+    @patch("run.time.sleep")
+    @patch("run.subprocess.run")
+    def test_no_retry_on_rate_limit_without_server_id(self, mock_run, mock_sleep):
+        """異常系: SERVER_ID 未設定でもレート制限時はリトライせず即座に例外が送出される"""
+        mock_run.return_value = make_proc(returncode=173, stderr="Limit reached: Too many requests received.")
+
+        with self.assertRaises(run.RateLimitError):
+            run.run_speedtest()
+
+        mock_run.assert_called_once()
+        mock_sleep.assert_not_called()
+
+    @patch("run.SERVER_ID", "48463")
+    @patch("run.time.sleep")
+    @patch("run.subprocess.run")
+    def test_stops_retrying_when_rate_limited_after_failure(self, mock_run, mock_sleep):
+        """異常系: 通常の失敗後にレート制限となった場合、残りのリトライ・フォールバックを行わない"""
+        mock_run.side_effect = [
+            make_proc(returncode=1, stderr="connection error"),
+            make_proc(returncode=173, stderr="Limit reached: Too many requests received."),
+            make_proc(),
+        ]
+
+        with self.assertRaises(run.RateLimitError):
+            run.run_speedtest()
+
+        self.assertEqual(mock_run.call_count, 2)
+        mock_sleep.assert_called_once_with(run.RETRY_DELAY)
+
+    @patch("run.time.sleep")
+    @patch("run.subprocess.run")
+    def test_detects_rate_limit_by_message_in_stdout(self, mock_run, mock_sleep):
+        """異常系: 終了コードが 173 以外でも stdout に Limit reached があればレート制限と判定する"""
+        log_line = json.dumps({"type": "log", "level": "error", "message": "Limit reached: Too many requests received."})
+        mock_run.return_value = make_proc(stdout=log_line, returncode=2)
+
+        with self.assertRaises(run.RateLimitError) as ctx:
+            run.run_speedtest()
+
+        self.assertIn("Limit reached", str(ctx.exception))
+        mock_run.assert_called_once()
+        mock_sleep.assert_not_called()
+
+    @patch("run.SERVER_ID", "48463")
+    @patch("run.time.sleep")
+    @patch("run.subprocess.run")
     def test_fallback_to_auto_select_when_fixed_server_fails(self, mock_run, mock_sleep):
         """準正常系: 固定サーバーが MAX_RETRIES 回失敗した場合、自動選択にフォールバックして成功する"""
         mock_run.side_effect = [
@@ -207,41 +265,23 @@ class TestRunSpeedtest(unittest.TestCase):
 
     @patch("run.time.sleep")
     @patch("run.subprocess.run")
-    def test_retries_on_low_download(self, mock_run, mock_sleep):
-        """準正常系: download が MIN_SPEED_MBPS 未満の場合にリトライし、次回成功する"""
+    def test_no_retry_on_low_speed(self, mock_run, mock_sleep):
+        """正常系: 低速な計測結果はリトライせずそのまま返す"""
         low_output = json.dumps({
             "type": "result",
             "ping": {"latency": 20.0},
-            "download": {"bandwidth": int(run.MIN_SPEED_MBPS * 1e6 / 8) - 1},  # bytes/s
-            "upload": {"bandwidth": 12_500_000},
+            "download": {"bandwidth": 1_250_000},  # 10 Mbps
+            "upload": {"bandwidth": 625_000},  # 5 Mbps
             "server": {"name": "Tokyo", "host": "speedtest.example.com", "country": "Japan"},
         })
-        mock_run.side_effect = [make_proc(stdout=low_output), make_proc()]
+        mock_run.return_value = make_proc(stdout=low_output)
 
         results = run.run_speedtest()
 
-        self.assertEqual(results["download"], SAMPLE_RESULTS["download"])
-        self.assertEqual(mock_run.call_count, 2)
-        mock_sleep.assert_called_once_with(run.RETRY_DELAY)
-
-    @patch("run.time.sleep")
-    @patch("run.subprocess.run")
-    def test_retries_on_low_upload(self, mock_run, mock_sleep):
-        """準正常系: upload が MIN_SPEED_MBPS 未満の場合にリトライし、次回成功する"""
-        low_output = json.dumps({
-            "type": "result",
-            "ping": {"latency": 20.0},
-            "download": {"bandwidth": 25_000_000},
-            "upload": {"bandwidth": int(run.MIN_SPEED_MBPS * 1e6 / 8) - 1},  # bytes/s
-            "server": {"name": "Tokyo", "host": "speedtest.example.com", "country": "Japan"},
-        })
-        mock_run.side_effect = [make_proc(stdout=low_output), make_proc()]
-
-        results = run.run_speedtest()
-
-        self.assertEqual(results["upload"], SAMPLE_RESULTS["upload"])
-        self.assertEqual(mock_run.call_count, 2)
-        mock_sleep.assert_called_once_with(run.RETRY_DELAY)
+        self.assertEqual(results["download"], 10_000_000.0)
+        self.assertEqual(results["upload"], 5_000_000.0)
+        mock_run.assert_called_once()
+        mock_sleep.assert_not_called()
 
     @patch("run.subprocess.run")
     def test_host_without_port(self, mock_run):
@@ -310,6 +350,15 @@ class TestMain(unittest.TestCase):
         with self.assertRaises(SystemExit) as ctx:
             run.main()
         self.assertEqual(ctx.exception.code, 1)
+
+    @patch("run.push_metrics")
+    @patch("run.run_speedtest", side_effect=run.RateLimitError("Limit reached"))
+    def test_main_exits_zero_on_rate_limit(self, _mock_run, mock_push):
+        """準正常系: レート制限時は push せず sys.exit(0) で終了する（Job を失敗扱いにしない）"""
+        with self.assertRaises(SystemExit) as ctx:
+            run.main()
+        self.assertEqual(ctx.exception.code, 0)
+        mock_push.assert_not_called()
 
     @patch("run.push_metrics", side_effect=Exception("push error"))
     @patch("run.run_speedtest", return_value=SAMPLE_RESULTS)

@@ -25,14 +25,14 @@ spec:
 
         - alert: SpeedtestDataStale
           expr: |
-            (time() - push_time_seconds{job="speedtest", instance="raspi-cluster"}) > 3600
-          # 即時発火: 15 分ごとの CronJob が 4 サイクル以上沈黙している状態を検知する
+            (time() - push_time_seconds{job="speedtest", instance="raspi-cluster"}) > 7200
+          # 即時発火: 30 分ごとの CronJob が 4 サイクル以上沈黙している状態を検知する
           for: 0m
           labels:
             severity: warning
           annotations:
-            summary: "Speedtest data has not been updated for over 1 hour"
-            description: "Speedtest のデータが 1 時間以上更新されていません。CronJob または Pushgateway に問題がある可能性があります。"
+            summary: "Speedtest data has not been updated for over 2 hours"
+            description: "Speedtest のデータが 2 時間以上更新されていません。CronJob または Pushgateway に問題がある可能性があります。"
 
         - alert: SpeedtestLowDownloadSpeed
           expr: |
