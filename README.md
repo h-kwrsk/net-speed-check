@@ -156,7 +156,7 @@ ssh raspi-master.local "kubectl get pods -n monitoring -l app=line-adapter"
 kubectl run curl-test --image=curlimages/curl:latest --rm --restart=Never -n monitoring -- \
   curl -s -X POST http://line-adapter.monitoring.svc.cluster.local:8080/webhook \
   -H 'Content-Type: application/json' \
-  -d '{"alerts":[{"status":"firing","labels":{"alertname":"SpeedtestJobFailed","job_name":"test"},"annotations":{"description":"テスト通知"}}]}'
+  -d '{"alerts":[{"status":"firing","labels":{"alertname":"SpeedtestJobFailed","job_name":"test"},"annotations":{"summary":"テスト通知です","description":"line-adapter からの通知テストです。","action":"対応は不要です。"},"startsAt":"2026-01-01T00:00:00Z"}]}'
 ```
 
 ## 開発
