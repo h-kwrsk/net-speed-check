@@ -26,18 +26,19 @@ spec:
           annotations:
             summary: "速度計測ジョブが失敗しました"
             description: "{{ $labels.job_name }} が計測エラーまたはデータ送信エラーで失敗しました。"
-            action: "kubectl logs -n monitoring job/{{ $labels.job_name }} でログを確認してください。この通知は 30 分後に自動で解消されます。"
+            action: "kubectl logs -n monitoring job/{{ $labels.job_name }} でログを確認してください。この通知は Job の作成から 30 分経つと自動で解消されます（問題が直ったことを意味しません）。"
 
         - alert: SpeedtestDataStale
           expr: |
-            (time() - push_time_seconds{job="speedtest", instance="raspi-cluster"}) > 7200
+            (time() - push_time_seconds{job="speedtest", instance="raspi-cluster"}) / 3600 > 2
           # 即時発火: 30 分ごとの CronJob が 4 サイクル以上沈黙している状態を検知する
+          # 通知文で経過時間を日本語の「時間」で表示するため、値は時間単位で返す
           for: 0m
           labels:
             severity: warning
           annotations:
             summary: "速度データが 2 時間以上更新されていません"
-            description: "最後に計測できてから {{ $value | humanizeDuration }} 経過しています。"
+            description: "最後に計測できてから約 {{ printf \"%.1f\" $value }} 時間経過しています。"
             action: "Ookla のレート制限、CronJob の停止、Pushgateway の障害が考えられます。kubectl get jobs -n monitoring で直近の Job を確認してください。"
 
         - alert: SpeedtestLowDownloadSpeed
@@ -48,7 +49,7 @@ spec:
             severity: warning
           annotations:
             summary: "ダウンロード速度が 50 Mbps を下回っています"
-            description: "計測値: {{ $value | humanize }}bps（通常は 400〜500 Mbps 程度）"
+            description: "計測値: {{ $value | humanize }}bps"
             action: "次回の計測（30 分後）でも続く場合は、回線やルーターの状態を確認してください。"
 
         - alert: SpeedtestLowUploadSpeed
@@ -59,5 +60,5 @@ spec:
             severity: warning
           annotations:
             summary: "アップロード速度が 50 Mbps を下回っています"
-            description: "計測値: {{ $value | humanize }}bps（通常は 400〜500 Mbps 程度）"
+            description: "計測値: {{ $value | humanize }}bps"
             action: "次回の計測（30 分後）でも続く場合は、回線やルーターの状態を確認してください。"

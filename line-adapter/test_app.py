@@ -65,7 +65,7 @@ class TestFormatMessage(unittest.TestCase):
         result = format_message(SAMPLE_ALERT)
         self.assertEqual(
             result,
-            "🔴【発生】速度計測ジョブが失敗しました\n"
+            "🔴【発生中】速度計測ジョブが失敗しました\n"
             "speedtest-123 が計測エラーまたはデータ送信エラーで失敗しました。\n"
             "発生時刻: 10/30 17:30\n"
             "対処: kubectl logs -n monitoring job/speedtest-123 でログを確認してください。",
@@ -85,11 +85,21 @@ class TestFormatMessage(unittest.TestCase):
         alert = {**RESOLVED_ALERT, "endsAt": "2026-10-30T09:00:00Z"}
         self.assertIn("（30分）", format_message(alert))
 
+    def test_duration_matches_displayed_times(self):
+        """正常系: 秒以下を切り捨てた表示時刻どうしの差を期間として表示する"""
+        alert = {**RESOLVED_ALERT, "startsAt": "2026-10-30T08:30:40Z", "endsAt": "2026-10-30T09:35:00Z"}
+        self.assertIn("期間: 10/30 17:30 〜 18:35（1時間5分）", format_message(alert))
+
+    def test_resolved_across_days_shows_end_date(self):
+        """正常系: 日付をまたぐ場合は終了時刻にも日付を表示する"""
+        alert = {**RESOLVED_ALERT, "startsAt": "2026-10-30T14:50:00Z", "endsAt": "2026-10-30T15:10:00Z"}
+        self.assertIn("期間: 10/30 23:50 〜 10/31 00:10（20分）", format_message(alert))
+
     def test_falls_back_to_alertname_without_summary(self):
         """正常系: summary がない場合は alertname を見出しに使う"""
         alert = {**SAMPLE_ALERT, "annotations": {}}
         result = format_message(alert)
-        self.assertEqual(result, "🔴【発生】SpeedtestJobFailed\n発生時刻: 10/30 17:30")
+        self.assertEqual(result, "🔴【発生中】SpeedtestJobFailed\n発生時刻: 10/30 17:30")
 
     def test_invalid_starts_at_is_omitted(self):
         """正常系: startsAt が不正な場合は発生時刻を表示しない"""
@@ -99,22 +109,27 @@ class TestFormatMessage(unittest.TestCase):
     def test_empty_alert(self):
         """正常系: labels・annotations・時刻がなくても例外が発生しない"""
         result = format_message({"status": "firing"})
-        self.assertEqual(result, "🔴【発生】不明なアラート")
+        self.assertEqual(result, "🔴【発生中】不明なアラート")
 
 
 class TestFormatNotification(unittest.TestCase):
 
-    def test_joins_alerts_with_firing_first(self):
-        """正常系: 複数アラートを 1 通にまとめ、発生中を先に表示する"""
-        result = format_notification([RESOLVED_ALERT, SAMPLE_ALERT])
-        self.assertLess(result.index("【発生】"), result.index("【解消】"))
+    def test_joins_alerts_with_resolved_first(self):
+        """正常系: 複数アラートを 1 通にまとめ、今回の変化である解消を先に表示する"""
+        result = format_notification([SAMPLE_ALERT, RESOLVED_ALERT])
+        self.assertLess(result.index("【解消】"), result.index("【発生中】"))
         self.assertIn("\n\n", result)
 
-    def test_truncates_long_message(self):
-        """異常系: LINE の上限文字数を超える場合は省略する"""
+    def test_truncates_long_message_by_utf16_length(self):
+        """異常系: UTF-16 単位で LINE の上限文字数を超える場合は省略する（絵文字は 2 単位）"""
         result = format_notification([SAMPLE_ALERT] * 100)
-        self.assertEqual(len(result), MAX_MESSAGE_LENGTH)
+        self.assertLessEqual(len(result.encode("utf-16-le")) // 2, MAX_MESSAGE_LENGTH)
         self.assertTrue(result.endswith("…（以下省略）"))
+
+    def test_does_not_truncate_short_message(self):
+        """正常系: 上限以内のメッセージはそのまま返す"""
+        result = format_notification([SAMPLE_ALERT])
+        self.assertNotIn("以下省略", result)
 
 
 class TestSendLineMessage(unittest.TestCase):
