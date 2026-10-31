@@ -9,12 +9,32 @@ from unittest.mock import MagicMock, patch
 os.environ.setdefault("LINE_CHANNEL_ACCESS_TOKEN", "test-token")
 os.environ.setdefault("LINE_USER_ID", "Utest000")
 
-from app import MAX_BODY_SIZE, WebhookHandler, format_message, send_line_message  # noqa: E402
+from app import (  # noqa: E402
+    MAX_BODY_SIZE,
+    MAX_MESSAGE_LENGTH,
+    WebhookHandler,
+    format_message,
+    format_notification,
+    send_line_message,
+)
 
 SAMPLE_ALERT = {
     "status": "firing",
     "labels": {"alertname": "SpeedtestJobFailed", "job_name": "speedtest-123"},
-    "annotations": {"description": "Speedtest CronJob で計測エラーが発生しました。\nJob: speedtest-123"},
+    "annotations": {
+        "summary": "速度計測ジョブが失敗しました",
+        "description": "speedtest-123 が計測エラーまたはデータ送信エラーで失敗しました。",
+        "action": "kubectl logs -n monitoring job/speedtest-123 でログを確認してください。",
+    },
+    # Alertmanager は UTC・ナノ秒精度で送ってくる
+    "startsAt": "2026-10-30T08:30:00.123456789Z",
+    "endsAt": "0001-01-01T00:00:00Z",
+}
+
+RESOLVED_ALERT = {
+    **SAMPLE_ALERT,
+    "status": "resolved",
+    "endsAt": "2026-10-30T09:35:00Z",
 }
 
 
@@ -40,43 +60,61 @@ def make_get_handler(path: str) -> WebhookHandler:
 
 class TestFormatMessage(unittest.TestCase):
 
-    def test_firing_includes_all_fields(self):
-        """正常系: firing アラートはすべてのフィールドを含む"""
+    def test_firing_message(self):
+        """正常系: 発生通知は見出し・内容・JST の発生時刻・対処を含む"""
         result = format_message(SAMPLE_ALERT)
-        self.assertIn("[FIRING]", result)
-        self.assertIn("SpeedtestJobFailed", result)
-        self.assertIn("speedtest-123", result)
-        self.assertIn("Speedtest CronJob で計測エラーが発生しました", result)
+        self.assertEqual(
+            result,
+            "🔴【発生】速度計測ジョブが失敗しました\n"
+            "speedtest-123 が計測エラーまたはデータ送信エラーで失敗しました。\n"
+            "発生時刻: 10/30 17:30\n"
+            "対処: kubectl logs -n monitoring job/speedtest-123 でログを確認してください。",
+        )
 
-    def test_resolved_status(self):
-        """正常系: resolved アラートは [RESOLVED] を含む"""
-        alert = {**SAMPLE_ALERT, "status": "resolved"}
-        result = format_message(alert)
-        self.assertIn("[RESOLVED]", result)
-        self.assertNotIn("[FIRING]", result)
+    def test_resolved_message(self):
+        """正常系: 解消通知は見出しと発生〜解消の期間のみを含む"""
+        result = format_message(RESOLVED_ALERT)
+        self.assertEqual(
+            result,
+            "✅【解消】速度計測ジョブが失敗しました\n"
+            "期間: 10/30 17:30 〜 18:35（1時間5分）",
+        )
 
-    def test_missing_job_name(self):
-        """正常系: job_name がなくても例外が発生しない"""
-        alert = {
-            "status": "firing",
-            "labels": {"alertname": "SpeedtestJobFailed"},
-            "annotations": {"description": "計測エラーが発生しました"},
-        }
-        result = format_message(alert)
-        self.assertIn("SpeedtestJobFailed", result)
-        self.assertNotIn("Job:", result)
+    def test_resolved_duration_under_one_hour(self):
+        """正常系: 1 時間未満の期間は分のみで表示する"""
+        alert = {**RESOLVED_ALERT, "endsAt": "2026-10-30T09:00:00Z"}
+        self.assertIn("（30分）", format_message(alert))
 
-    def test_missing_description(self):
-        """正常系: description がなくても例外が発生しない"""
+    def test_falls_back_to_alertname_without_summary(self):
+        """正常系: summary がない場合は alertname を見出しに使う"""
         alert = {**SAMPLE_ALERT, "annotations": {}}
         result = format_message(alert)
-        self.assertIn("[FIRING]", result)
+        self.assertEqual(result, "🔴【発生】SpeedtestJobFailed\n発生時刻: 10/30 17:30")
 
-    def test_empty_labels_and_annotations(self):
-        """正常系: labels・annotations が空でも例外が発生しない"""
-        alert = {"status": "firing", "labels": {}, "annotations": {}}
-        result = format_message(alert)
-        self.assertIn("[FIRING]", result)
+    def test_invalid_starts_at_is_omitted(self):
+        """正常系: startsAt が不正な場合は発生時刻を表示しない"""
+        alert = {**SAMPLE_ALERT, "startsAt": "invalid"}
+        self.assertNotIn("発生時刻", format_message(alert))
+
+    def test_empty_alert(self):
+        """正常系: labels・annotations・時刻がなくても例外が発生しない"""
+        result = format_message({"status": "firing"})
+        self.assertEqual(result, "🔴【発生】不明なアラート")
+
+
+class TestFormatNotification(unittest.TestCase):
+
+    def test_joins_alerts_with_firing_first(self):
+        """正常系: 複数アラートを 1 通にまとめ、発生中を先に表示する"""
+        result = format_notification([RESOLVED_ALERT, SAMPLE_ALERT])
+        self.assertLess(result.index("【発生】"), result.index("【解消】"))
+        self.assertIn("\n\n", result)
+
+    def test_truncates_long_message(self):
+        """異常系: LINE の上限文字数を超える場合は省略する"""
+        result = format_notification([SAMPLE_ALERT] * 100)
+        self.assertEqual(len(result), MAX_MESSAGE_LENGTH)
+        self.assertTrue(result.endswith("…（以下省略）"))
 
 
 class TestSendLineMessage(unittest.TestCase):
@@ -118,11 +156,11 @@ class TestWebhookHandler(unittest.TestCase):
         handler.send_response.assert_called_once_with(200)
 
     @patch("app.send_line_message")
-    def test_multiple_alerts_sends_each(self, mock_send):
-        """正常系: 複数アラートをそれぞれ LINE 送信する"""
-        handler = make_handler({"alerts": [SAMPLE_ALERT, SAMPLE_ALERT]})
+    def test_multiple_alerts_sends_once(self, mock_send):
+        """正常系: 複数アラートは 1 通にまとめて LINE 送信する"""
+        handler = make_handler({"alerts": [SAMPLE_ALERT, RESOLVED_ALERT]})
         handler.do_POST()
-        self.assertEqual(mock_send.call_count, 2)
+        mock_send.assert_called_once()
 
     @patch("app.send_line_message", side_effect=Exception("LINE error"))
     def test_line_error_returns_500(self, _mock_send):
