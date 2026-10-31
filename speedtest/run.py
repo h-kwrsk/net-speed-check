@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """
 インターネット速度を計測し、結果を Prometheus Pushgateway へ送信するスクリプト。
-Kubernetes CronJob として 15 分ごとに実行されることを想定している。
+Kubernetes CronJob として 30 分ごとに実行されることを想定している。
 """
 import json
 import logging
@@ -31,6 +31,15 @@ MIN_SPEED_MBPS = float(os.environ.get("SPEEDTEST_MIN_SPEED_MBPS", "50"))
 # 未設定時は Ookla CLI がレイテンシ最小のサーバーを自動選択する
 SERVER_ID = os.environ.get("SPEEDTEST_SERVER_ID", "")
 
+# Ookla CLI はリクエスト過多で "Limit reached" になると exit code 173 を返す
+RATE_LIMIT_EXIT_CODE = 173
+
+
+class RateLimitError(RuntimeError):
+    """Ookla のレート制限に達したことを表す。
+    制限中にリトライすると制限期間を長引かせるため、即座に失敗させる。
+    """
+
 
 def _parse_result(stdout: str) -> dict[str, object]:
     """speedtest CLI の JSON 出力から type=result のオブジェクトを抽出する。
@@ -51,6 +60,7 @@ def run_speedtest() -> dict[str, object]:
 
     SERVER_ID が設定されている場合、固定サーバーで MAX_RETRIES 回試みた後、
     すべて失敗したら自動選択で 1 回フォールバックする。
+    レート制限（RateLimitError）の場合はリトライ・フォールバックせず即座に送出する。
     """
     last_error = None
     # SERVER_ID が設定されている場合: [固定 × MAX_RETRIES, 自動選択 × 1]
@@ -74,6 +84,10 @@ def run_speedtest() -> dict[str, object]:
                 text=True,
                 timeout=120,
             )
+            if proc.returncode == RATE_LIMIT_EXIT_CODE:
+                raise RateLimitError(
+                    f"speedtest rate limited (exit code {proc.returncode}): {proc.stderr.strip()}"
+                )
             if proc.returncode != 0:
                 raise RuntimeError(
                     f"speedtest exited with code {proc.returncode}: {proc.stderr.strip()}"
@@ -125,6 +139,9 @@ def run_speedtest() -> dict[str, object]:
                 results["server"]["country"],
             )
             return results
+        except RateLimitError:
+            log.warning("Rate limit reached on attempt %d/%d; skipping remaining retries", attempt, total)
+            raise
         except Exception as e:
             last_error = e
             log.warning("Attempt %d/%d failed: %s", attempt, total, e)

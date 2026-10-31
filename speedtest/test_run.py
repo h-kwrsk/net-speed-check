@@ -172,6 +172,20 @@ class TestRunSpeedtest(unittest.TestCase):
     @patch("run.SERVER_ID", "48463")
     @patch("run.time.sleep")
     @patch("run.subprocess.run")
+    def test_no_retry_on_rate_limit(self, mock_run, mock_sleep):
+        """異常系: レート制限（exit 173）時はリトライ・フォールバックせず即座に例外が送出される"""
+        mock_run.return_value = make_proc(returncode=173, stderr="Limit reached: Too many requests received.")
+
+        with self.assertRaises(run.RateLimitError) as ctx:
+            run.run_speedtest()
+
+        self.assertIn("Limit reached", str(ctx.exception))
+        mock_run.assert_called_once()
+        mock_sleep.assert_not_called()
+
+    @patch("run.SERVER_ID", "48463")
+    @patch("run.time.sleep")
+    @patch("run.subprocess.run")
     def test_fallback_to_auto_select_when_fixed_server_fails(self, mock_run, mock_sleep):
         """準正常系: 固定サーバーが MAX_RETRIES 回失敗した場合、自動選択にフォールバックして成功する"""
         mock_run.side_effect = [
