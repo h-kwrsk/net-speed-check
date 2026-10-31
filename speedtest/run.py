@@ -23,16 +23,14 @@ INSTANCE = os.environ.get("SPEEDTEST_INSTANCE", "raspi-cluster")
 MAX_RETRIES = int(os.environ.get("SPEEDTEST_MAX_RETRIES", "3"))
 RETRY_DELAY = int(os.environ.get("SPEEDTEST_RETRY_DELAY", "30"))  # seconds
 
-# 品質の低いサーバーに接続した場合の結果を除外するための下限閾値
-# 通常値 400〜470 Mbps に対して 1/8 程度を設定
-MIN_SPEED_MBPS = float(os.environ.get("SPEEDTEST_MIN_SPEED_MBPS", "50"))
-
 # 計測サーバーを固定することで、サーバー起因のブレを排除して一貫した計測を行う
 # 未設定時は Ookla CLI がレイテンシ最小のサーバーを自動選択する
 SERVER_ID = os.environ.get("SPEEDTEST_SERVER_ID", "")
 
-# Ookla CLI はリクエスト過多で "Limit reached" になると exit code 173 を返す
+# Ookla CLI はリクエスト過多で "Limit reached" になると exit code 173 を返す。
+# 終了コードは非公開仕様のため、出力中のメッセージでも判定する
 RATE_LIMIT_EXIT_CODE = 173
+RATE_LIMIT_MESSAGE = "Limit reached"
 
 
 class RateLimitError(RuntimeError):
@@ -61,6 +59,7 @@ def run_speedtest() -> dict[str, object]:
     SERVER_ID が設定されている場合、固定サーバーで MAX_RETRIES 回試みた後、
     すべて失敗したら自動選択で 1 回フォールバックする。
     レート制限（RateLimitError）の場合はリトライ・フォールバックせず即座に送出する。
+    リトライのたびに Ookla へのリクエストが増えるため、低速な計測結果はリトライせずそのまま返す。
     """
     last_error = None
     # SERVER_ID が設定されている場合: [固定 × MAX_RETRIES, 自動選択 × 1]
@@ -84,9 +83,13 @@ def run_speedtest() -> dict[str, object]:
                 text=True,
                 timeout=120,
             )
-            if proc.returncode == RATE_LIMIT_EXIT_CODE:
+            # --format=json 指定時はエラーが stdout に JSON で出る場合もあるため両方を確認する
+            output = f"{proc.stderr.strip()} {proc.stdout.strip()}".strip()
+            if proc.returncode == RATE_LIMIT_EXIT_CODE or (
+                proc.returncode != 0 and RATE_LIMIT_MESSAGE in output
+            ):
                 raise RateLimitError(
-                    f"speedtest rate limited (exit code {proc.returncode}): {proc.stderr.strip()}"
+                    f"speedtest rate limited (exit code {proc.returncode}): {output[:300]}"
                 )
             if proc.returncode != 0:
                 raise RuntimeError(
@@ -122,14 +125,6 @@ def run_speedtest() -> dict[str, object]:
                     f"upload={results['upload'] / 1e6:.2f} Mbps"
                 )
 
-            # MIN_SPEED_MBPS 未満は品質不良とみなしてリトライする
-            if results["download"] < MIN_SPEED_MBPS * 1e6 or results["upload"] < MIN_SPEED_MBPS * 1e6:
-                raise ValueError(
-                    f"Speed below threshold ({MIN_SPEED_MBPS:.0f} Mbps): "
-                    f"download={results['download'] / 1e6:.2f} Mbps, "
-                    f"upload={results['upload'] / 1e6:.2f} Mbps"
-                )
-
             log.info(
                 "Results: download=%.2f Mbps, upload=%.2f Mbps, ping=%.2f ms, server=%s (%s)",
                 results["download"] / 1e6,
@@ -140,7 +135,7 @@ def run_speedtest() -> dict[str, object]:
             )
             return results
         except RateLimitError:
-            log.warning("Rate limit reached on attempt %d/%d; skipping remaining retries", attempt, total)
+            # 下の except Exception でリトライされないよう、そのまま送出する
             raise
         except Exception as e:
             last_error = e
@@ -210,6 +205,11 @@ def push_metrics(results: dict[str, object]) -> None:
 def main() -> None:
     try:
         results = run_speedtest()
+    except RateLimitError as e:
+        # レート制限は想定内の状態のため Job を成功扱いにし、SpeedtestJobFailed を発火させない。
+        # 制限が長引いた場合は SpeedtestDataStale で検知する
+        log.warning("Speed test skipped due to rate limit: %s", e)
+        sys.exit(0)
     except Exception as e:
         log.error("Speed test failed: %s", e)
         sys.exit(1)

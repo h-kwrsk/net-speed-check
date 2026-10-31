@@ -176,7 +176,6 @@ python -m pytest line-adapter/test_app.py -v
 | `SPEEDTEST_INSTANCE` | `raspi-cluster` | Prometheus の `instance` ラベルに使う識別子 |
 | `SPEEDTEST_MAX_RETRIES` | `3` | 計測失敗時の最大リトライ回数（レート制限 exit 173 の場合はリトライしない） |
 | `SPEEDTEST_RETRY_DELAY` | `30` | リトライ間隔（秒） |
-| `SPEEDTEST_MIN_SPEED_MBPS` | `50` | この値（Mbps）未満の計測結果はリトライ対象とする下限閾値 |
 | `SPEEDTEST_SERVER_ID` | （未設定） | 接続するサーバーの ID（未設定時は自動選択）。`speedtest --list` で確認可能 |
 
 ## アラート
@@ -185,7 +184,7 @@ Alertmanager 経由で LINE に通知されるアラートの一覧です。す�
 
 | アラート名 | 条件 | 説明 |
 | --- | --- | --- |
-| `SpeedtestJobFailed` | Job 失敗 かつ 作成から 30 分以内 | CronJob の計測・送信エラー。30 分後に自動解消 |
+| `SpeedtestJobFailed` | Job 失敗 かつ 作成から 30 分以内 | CronJob の計測・送信エラー。30 分後に自動解消（Ookla のレート制限は想定内として Job 成功扱いになり発火しない） |
 | `SpeedtestDataStale` | 最終 push から 2 時間以上経過 | CronJob 停止・Pushgateway 障害など Job 失敗では検知できない異常 |
 | `SpeedtestLowDownloadSpeed` | DL < 50 Mbps | ダウンロード速度の低下 |
 | `SpeedtestLowUploadSpeed` | UL < 50 Mbps | アップロード速度の低下 |
